@@ -15,6 +15,8 @@ Requirements: Linux, Podman 4.3 or later (rootless recommended), Node 20 or late
 15 GB of disk, and Claude credentials.
 
 ```sh
+nvm install && nvm use               # the Node version in .nvmrc
+
 # Claude credentials: an API key, or a long-lived token from `claude setup-token`
 export CLAUDE_CODE_OAUTH_TOKEN=...      # or ANTHROPIC_API_KEY=...
 
@@ -178,5 +180,12 @@ node measure.mjs ../gold /tmp/gold-results --runs 1 --skip-build   # needs Caddy
 - **"Change game" has no INP.** A native `<select>` can't be operated by a real interaction
   in headless Chrome, so the flow sets the value and dispatches the events itself. Its
   latency is still measured.
+- **Versions are pinned** where it matters: Node comes from `.nvmrc` (a symlink to
+  `template/.nvmrc`), and npm is the version bundled with that Node release. The containers
+  install that exact Node from nodejs.org, with checksum verification. Playwright and
+  agent-browser are pinned in the Containerfiles. Pass `--claude-version` and `--model`
+  to pin the agent. Frameworks are deliberately *not* pinned: each agent installs the latest
+  release, and the versions it picked are in its `repo/app/package-lock.json`. The Ubuntu
+  base image and apt packages float; `run.mjs` records the harness commit in `config.json`.
 - **One iteration is an anecdote.** Agent runs vary a lot; use 3 or more iterations before
   drawing conclusions.

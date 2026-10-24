@@ -132,7 +132,7 @@ export function writeReport(runDir) {
     ].join('\n');
 
   const versions = iterations
-    .map((it) => `| ${it.dir} | ${it.info.claude_code ?? '—'} | ${it.info.model ?? '—'} | ${it.info.final_test_exit === '0' ? 'pass' : 'FAIL'} | ${it.errors.join('; ') || '—'} |`)
+    .map((it) => `| ${it.dir} | ${it.info.claude_code ?? '—'} | ${it.info.model ?? '—'} | ${it.info.node ?? '—'} | ${it.info.final_test_exit === '0' ? 'pass' : 'FAIL'} | ${it.errors.join('; ') || '—'} |`)
     .join('\n');
 
   const md = `# Pokédex framework benchmark
@@ -164,8 +164,8 @@ ${table(COLUMNS.slice(19))}
 
 ## Iterations
 
-| Iteration | Claude Code | Model | Final tests | Problems |
-| --- | --- | --- | --- | --- |
+| Iteration | Claude Code | Model | Node | Final tests | Problems |
+| --- | --- | --- | --- | --- | --- |
 ${versions}
 `;
   fs.writeFileSync(path.join(runDir, 'report.md'), md);

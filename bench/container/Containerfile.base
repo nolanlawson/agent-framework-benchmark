@@ -3,14 +3,27 @@
 # Build context: a directory containing work/ (from export-template.sh).
 FROM docker.io/library/ubuntu:24.04
 
-ARG NODE_MAJOR=24
+# Exact Node version from template/.nvmrc (passed in by run.mjs). npm is the version
+# bundled with that Node release.
+ARG NODE_VERSION
 ARG PLAYWRIGHT_VERSION=1.64.1
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git xz-utils build-essential python3 jq \
- && curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
- && apt-get install -y --no-install-recommends nodejs \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN test -n "$NODE_VERSION" || { echo "NODE_VERSION build arg is required" >&2; exit 1; } \
+ && case "$(uname -m)" in x86_64) ARCH=x64 ;; aarch64) ARCH=arm64 ;; *) echo "unsupported arch" >&2; exit 1 ;; esac \
+ && TARBALL="node-v${NODE_VERSION}-linux-${ARCH}.tar.xz" \
+ && cd /tmp \
+ && curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/${TARBALL}" \
+ && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" | grep " ${TARBALL}\$" | sha256sum -c - \
+ && tar -xJf "${TARBALL}" -C /usr/local --strip-components=1 --no-same-owner \
+ && rm "${TARBALL}" \
+ && node --version && npm --version
+
+RUN apt-get update \
  && npx -y playwright@${PLAYWRIGHT_VERSION} install-deps chromium \
  && rm -rf /var/lib/apt/lists/*
 
@@ -26,7 +39,7 @@ WORKDIR /home/agent/work
 # the ~2 GB download happens once and is reused until scripts/ or package*.json change.
 COPY --chown=agent:agent work/scripts/ /home/agent/work/scripts/
 RUN ./scripts/setup-data.sh
-COPY --chown=agent:agent work/package.json work/package-lock.json /home/agent/work/
+COPY --chown=agent:agent work/package.json work/package-lock.json work/.nvmrc /home/agent/work/
 RUN npm install --no-audit --no-fund && npx playwright install chromium
 
 COPY --chown=agent:agent work/ /home/agent/work/

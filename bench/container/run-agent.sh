@@ -31,6 +31,7 @@ fi
   echo "claude_code=$(claude --version)"
   echo "agent_browser=$(agent-browser --version 2>/dev/null || true)"
   echo "node=$(node --version)"
+  echo "npm=$(npm --version)"
   echo "started=$(date -u +%FT%TZ)"
 } > "$OUT/run-info.txt"
 

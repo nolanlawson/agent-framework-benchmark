@@ -47,6 +47,8 @@ import { writeReport } from './report.mjs';
 const BENCH = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(BENCH, '..');
 const IMAGES = { base: 'pokedex-base', agent: 'pokedex-agent', measure: 'pokedex-measure' };
+// Exact Node version for every container (npm comes bundled with it). The root .nvmrc links here.
+const NODE_VERSION = fs.readFileSync(path.join(ROOT, 'template/.nvmrc'), 'utf8').trim();
 
 // ---------- Options ----------
 
@@ -117,6 +119,9 @@ const writableDir = (dir) => {
 function preflight() {
   const major = Number(process.versions.node.split('.')[0]);
   if (major < 20) throw new Error(`Node 20+ required (found ${process.versions.node})`);
+  if (process.versions.node !== NODE_VERSION) {
+    log(`Note: host Node is ${process.versions.node}; containers use ${NODE_VERSION} (.nvmrc). Run \`nvm use\` to match.`);
+  }
   const podman = spawnSync('podman', ['--version'], { encoding: 'utf8' });
   if (podman.status !== 0) throw new Error('podman not found on PATH');
   return podman.stdout.trim();
@@ -144,7 +149,7 @@ function buildImages(runDir) {
     log(`Building ${image}`);
     sh('podman', ['build', ...cacheArgs, '-t', image, '-f', file, ...buildArgs, context]);
   };
-  build(IMAGES.base, path.join(BENCH, 'container/Containerfile.base'), ctx);
+  build(IMAGES.base, path.join(BENCH, 'container/Containerfile.base'), ctx, ['--build-arg', `NODE_VERSION=${NODE_VERSION}`]);
   build(IMAGES.agent, path.join(BENCH, 'container/Containerfile.agent'), path.join(BENCH, 'container'), [
     '--build-arg', `BASE=${IMAGES.base}`,
     '--build-arg', `CLAUDE_CODE_VERSION=${config.claudeVersion}`,
@@ -283,6 +288,7 @@ async function main() {
         frameworks,
         prompts: Object.fromEntries(frameworks.map((f) => [f, prompt(FRAMEWORKS[f])])),
         startedAt: new Date().toISOString(),
+        nodeVersion: NODE_VERSION,
         harnessCommit,
         harnessDirty,
         podman: podmanVersion,
