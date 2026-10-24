@@ -14,5 +14,5 @@ ENV IS_SANDBOX=1 \
     DISABLE_AUTOUPDATER=1
 RUN agent-browser install
 
-COPY --chown=agent:agent run-agent.sh setup-tooling.sh /home/agent/
+COPY --chown=agent:agent run-agent.sh setup-tooling.sh mcp-probe.sh /home/agent/
 ENTRYPOINT ["/home/agent/run-agent.sh"]

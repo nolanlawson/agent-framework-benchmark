@@ -32,7 +32,10 @@ const fmt = (x, d = 0) => (x === null || x === undefined || Number.isNaN(x) ? 'â
 
 function readIteration(dir) {
   const info = readRunInfo(path.join(dir, 'agent/run-info.txt'));
-  const it = { dir: path.basename(dir), info, agent: null, measure: null, errors: [] };
+  const it = { dir: path.basename(dir), info, agent: null, measure: null, tooling: [], errors: [] };
+  try {
+    it.tooling = JSON.parse(fs.readFileSync(path.join(dir, 'agent/tooling-versions.json'), 'utf8'));
+  } catch {}
   try {
     it.agent = summarizeTranscript(path.join(dir, 'agent/transcript.jsonl'));
   } catch (err) {
@@ -102,6 +105,26 @@ const COLUMNS = [
   ['Build (s)', (r) => fmt(r.buildS, 1)],
 ];
 
+function toolingLabel(t) {
+  if (t.kind === 'skill') return `skill ${t.repo}@${t.commit?.slice(0, 7)}${t.args?.length ? ` (${t.args.join(' ')})` : ''}`;
+  if (t.kind === 'mcp (stdio)') return `MCP ${t.package}@${t.version}`;
+  if (t.kind === 'mcp (hosted)') return `MCP ${t.url} (${t.tools?.length ?? '?'} tools, sha256 ${t.toolsSha256?.slice(0, 12) ?? '?'})`;
+  if (t.kind === 'claude plugin') return `plugin ${t.name}@${t.commit?.slice(0, 7)} (${t.mcpPackage}@${t.mcpVersion})`;
+  return JSON.stringify(t);
+}
+
+function versionsSection(iterations) {
+  return iterations
+    .map((it) => {
+      const deps = Object.entries(it.measure?.code.installed ?? {})
+        .map(([name, version]) => `\`${name}@${version ?? '?'}\``)
+        .join(', ');
+      const tooling = it.tooling.map(toolingLabel).join('; ') || 'none';
+      return `- **${it.dir}**: ${deps || 'not measured'}\n  - Tooling: ${tooling}\n  - Node ${it.info.node ?? '?'}, npm ${it.info.npm ?? '?'}, Claude Code ${it.info.claude_code ?? '?'}, agent-browser ${it.info.agent_browser ?? '?'}`;
+    })
+    .join('\n');
+}
+
 export function writeReport(runDir) {
   const config = fs.existsSync(path.join(runDir, 'config.json')) ? JSON.parse(fs.readFileSync(path.join(runDir, 'config.json'), 'utf8')) : {};
   const iterations = fs
@@ -161,6 +184,12 @@ ${table(COLUMNS.slice(14, 19))}
 "Visual match" is the share of pixels that match the reference screenshots (1 = identical).
 
 ${table(COLUMNS.slice(19))}
+
+## Versions
+
+Direct dependencies of each app, as installed for measurement, and the agent tooling.
+
+${versionsSection(iterations)}
 
 ## Iterations
 

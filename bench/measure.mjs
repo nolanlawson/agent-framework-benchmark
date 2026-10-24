@@ -281,12 +281,22 @@ function codeStats() {
   for (const f of files.filter((f) => SOURCE.test(f))) lines += fs.readFileSync(path.join(appDir, f), 'utf8').split('\n').length;
   const pkg = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'));
   const du = spawnSync('du', ['-sk', 'node_modules'], { cwd: appDir, encoding: 'utf8' }).stdout.split('\t')[0];
+  // Versions actually installed for the measured build (not just the ranges in package.json).
+  const installed = {};
+  for (const dep of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
+    try {
+      installed[dep] = JSON.parse(fs.readFileSync(path.join(appDir, 'node_modules', dep, 'package.json'), 'utf8')).version;
+    } catch {
+      installed[dep] = null;
+    }
+  }
   return {
     files: files.length,
     sourceLines: lines,
     dependencies: Object.keys(pkg.dependencies ?? {}).length,
     devDependencies: Object.keys(pkg.devDependencies ?? {}).length,
     nodeModulesKiB: Number(du) || null,
+    installed,
   };
 }
 

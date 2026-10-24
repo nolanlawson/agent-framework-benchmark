@@ -22,7 +22,7 @@ if [ -n "${HOST_CLAUDE_CREDENTIALS:-}" ]; then
   unset HOST_CLAUDE_CREDENTIALS
 fi
 
-/home/agent/setup-tooling.sh "$FRAMEWORK" /home/agent/mcp.json > "$OUT/tooling.log" 2>&1
+/home/agent/setup-tooling.sh "$FRAMEWORK" /home/agent/mcp.json "$OUT/tooling-versions.json" > "$OUT/tooling.log" 2>&1
 
 {
   echo "framework=$FRAMEWORK"
@@ -32,6 +32,7 @@ fi
   echo "agent_browser=$(agent-browser --version 2>/dev/null || true)"
   echo "node=$(node --version)"
   echo "npm=$(npm --version)"
+  echo "playwright=$(npx playwright --version | sed 's/^Version //')"
   echo "started=$(date -u +%FT%TZ)"
 } > "$OUT/run-info.txt"
 

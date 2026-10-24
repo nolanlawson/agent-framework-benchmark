@@ -156,6 +156,20 @@ function buildImages(runDir) {
   ]);
   build(IMAGES.measure, path.join(BENCH, 'container/Containerfile.measure'), BENCH, ['--build-arg', `BASE=${IMAGES.base}`]);
   fs.rmSync(ctx, { recursive: true, force: true });
+  recordImages(runDir);
+}
+
+// Adds the image IDs and the Ubuntu base image digest to config.json.
+function recordImages(runDir) {
+  const inspect = (image, format) =>
+    spawnSync('podman', ['image', 'inspect', image, '--format', format], { encoding: 'utf8' }).stdout.trim() || null;
+  const file = path.join(runDir, 'config.json');
+  const config = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+  config.images = {
+    ubuntu: inspect('docker.io/library/ubuntu:24.04', '{{.Digest}}'),
+    ...Object.fromEntries(Object.values(IMAGES).map((image) => [image, inspect(image, '{{.Id}}')])),
+  };
+  fs.writeFileSync(file, JSON.stringify(config, null, 2));
 }
 
 // ---------- Step 2: agents ----------

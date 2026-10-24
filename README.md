@@ -130,7 +130,8 @@ For each iteration, `runs/<id>/<framework>-<n>/` contains:
 | `agent/transcript.jsonl` | The agent's full session (Claude Code stream-json) |
 | `agent/run-info.txt` | Versions, start and finish times, and the exit codes of `claude` and the final `npm test` |
 | `agent/final-test.log` | The final test run, against the original tests |
-| `agent/tooling.log` | What `setup-tooling.sh` installed |
+| `agent/tooling.log` | Output of `setup-tooling.sh` |
+| `agent/tooling-versions.json` | Exact versions or commits of the MCP servers, skills and plugins the agent had |
 | `agent/git-status.txt` | Files the agent changed or added |
 | `container.log` | Podman output for the agent container |
 | `repo/` | The agent's repo; the app is in `repo/app/` |
@@ -180,12 +181,19 @@ node measure.mjs ../gold /tmp/gold-results --runs 1 --skip-build   # needs Caddy
 - **"Change game" has no INP.** A native `<select>` can't be operated by a real interaction
   in headless Chrome, so the flow sets the value and dispatches the events itself. Its
   latency is still measured.
-- **Versions are pinned** where it matters: Node comes from `.nvmrc` (a symlink to
-  `template/.nvmrc`), and npm is the version bundled with that Node release. The containers
-  install that exact Node from nodejs.org, with checksum verification. Playwright and
-  agent-browser are pinned in the Containerfiles. Pass `--claude-version` and `--model`
-  to pin the agent. Frameworks are deliberately *not* pinned: each agent installs the latest
-  release, and the versions it picked are in its `repo/app/package-lock.json`. The Ubuntu
-  base image and apt packages float; `run.mjs` records the harness commit in `config.json`.
+- **Pinned versus recorded.** Node is pinned by `.nvmrc` (a symlink to `template/.nvmrc`);
+  the containers install that exact version from nodejs.org, with checksum verification,
+  and npm is the version bundled with it. Playwright and agent-browser are pinned in the
+  Containerfiles; pass `--claude-version` and `--model` to pin the agent. Frameworks and
+  their AI tooling are deliberately *not* pinned: each agent uses the latest release, like a
+  real user would. Each result is a dated snapshot of the whole ecosystem (model, frameworks,
+  tooling, docs, search results), none of which can be frozen for a rerun years later anyway.
+  Everything that was used is recorded instead:
+  - the app's installed dependency versions (`measure/results.json`, and the report)
+  - MCP package versions; npx-launched servers are pinned to exactly the recorded version
+  - for hosted MCP servers, their tool list and a hash of it
+  - the commit of every skill and plugin repo (`agent/tooling-versions.json`)
+  - Node, npm, Playwright, Claude Code and agent-browser versions (`agent/run-info.txt`)
+  - the image IDs and the Ubuntu base image digest (`config.json`)
 - **One iteration is an anecdote.** Agent runs vary a lot; use 3 or more iterations before
   drawing conclusions.
