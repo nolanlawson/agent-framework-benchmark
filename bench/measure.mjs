@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-// Measures one implementation: node bench/measure.mjs <name> <appDir> [--runs N] [--skip-build]
-// Writes results/<name>/results.json (plus raw Lighthouse reports and screenshots).
+// Measures one implementation: node bench/measure.mjs <appDir> <outDir> [--runs N] [--skip-build]
+// Writes <outDir>/results.json, plus raw Lighthouse reports and screenshots.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import lighthouse, { desktopConfig, startFlow } from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import puppeteer from 'puppeteer-core';
@@ -15,17 +14,16 @@ import pixelmatch from 'pixelmatch';
 import { startStack, APP_ORIGIN, APP_PORT, TEMPLATE } from './stack.mjs';
 import { capture, PAGES, VIEWPORTS } from './screenshots.mjs';
 
-const BENCH = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
-const [name, appDirArg] = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--runs');
-if (!name || !appDirArg) {
-  console.error('Usage: measure.mjs <name> <appDir> [--runs N] [--skip-build]');
+const [appDirArg, outArg] = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--runs');
+if (!appDirArg || !outArg) {
+  console.error('Usage: measure.mjs <appDir> <outDir> [--runs N] [--skip-build]');
   process.exit(1);
 }
 const RUNS = Number(args[args.indexOf('--runs') + 1]) || 5;
 const FLOW_RUNS = Math.max(1, Math.ceil(RUNS / 2));
 const appDir = path.resolve(appDirArg);
-const out = path.join(BENCH, 'results', name);
+const out = path.resolve(outArg);
 fs.mkdirSync(path.join(out, 'lighthouse'), { recursive: true });
 
 const CHROME = chromium.executablePath();
@@ -274,7 +272,7 @@ async function runVisual() {
 // ----- Code stats -----
 
 function codeStats() {
-  const files = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '.'], { cwd: appDir, encoding: 'utf8' })
+  const files = spawnSync('git', ['-c', 'safe.directory=*', 'ls-files', '--cached', '--others', '--exclude-standard', '.'], { cwd: appDir, encoding: 'utf8' })
     .stdout.split('\n')
     .filter((f) => f && !/(^|\/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?)$/.test(f))
     .filter((f) => fs.existsSync(path.join(appDir, f)));
@@ -294,8 +292,8 @@ function codeStats() {
 
 // ----- Main -----
 
-const results = { name, appDir, measuredAt: new Date().toISOString(), runs: RUNS };
-console.log(`Measuring ${name} (${appDir})`);
+const results = { appDir, measuredAt: new Date().toISOString(), runs: RUNS };
+console.log(`Measuring ${appDir}`);
 const stack = await startStack(appDir, { build: !args.includes('--skip-build') });
 try {
   results.buildMs = stack.buildMs;

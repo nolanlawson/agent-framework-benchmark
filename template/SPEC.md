@@ -237,6 +237,14 @@ typography closely; pixel-for-pixel equality isn't required.
 - No animations or transitions.
 - Light theme only.
 
+## Environment
+
+- Node.js 24 and npm. You may install other package managers or tools.
+- [`agent-browser`](https://github.com/vercel-labs/agent-browser) is installed for looking
+  at pages in a headless browser (run `agent-browser --help`). Playwright's Chromium is
+  installed for the tests.
+- You have internet access (npm, documentation, web search), except for `pokeapi.co`.
+
 ## Constraints
 
 - The app must work in the latest Chromium. Other browsers don't matter.

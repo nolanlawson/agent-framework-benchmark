@@ -1,5 +1,6 @@
 node_modules/
 test-results/
 playwright-report/
+/runs/
 bench/results/
 bench/.caddy/

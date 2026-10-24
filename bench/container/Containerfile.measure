@@ -1,0 +1,20 @@
+# Measures one agent's app: builds and serves it behind Caddy, then runs Lighthouse, the
+# scripted flow and the screenshot comparison. Never shown to agents.
+# Build context: bench/ (the measurement scripts).
+ARG BASE=pokedex-base
+FROM ${BASE}
+
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends caddy \
+ && install -d -o agent -g agent /home/agent/bench \
+ && rm -rf /var/lib/apt/lists/*
+
+USER agent
+WORKDIR /home/agent/bench
+COPY --chown=agent:agent package.json package-lock.json /home/agent/bench/
+RUN npm ci --no-audit --no-fund
+COPY --chown=agent:agent stack.mjs measure.mjs screenshots.mjs /home/agent/bench/
+
+ENV TEMPLATE_DIR=/home/agent/work
+ENTRYPOINT ["node", "/home/agent/bench/measure.mjs"]

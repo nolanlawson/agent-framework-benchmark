@@ -1,0 +1,36 @@
+# Base image shared by the agent and measurement images: Ubuntu 24.04, Node, Playwright's
+# Chromium, and the exported template repo with its data downloaded.
+# Build context: a directory containing work/ (from export-template.sh).
+FROM docker.io/library/ubuntu:24.04
+
+ARG NODE_MAJOR=24
+ARG PLAYWRIGHT_VERSION=1.64.1
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl git xz-utils build-essential python3 jq \
+ && curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
+ && npx -y playwright@${PLAYWRIGHT_VERSION} install-deps chromium \
+ && rm -rf /var/lib/apt/lists/*
+
+# Replace the image's default "ubuntu" user so "agent" gets uid/gid 1000.
+RUN (userdel --remove ubuntu 2>/dev/null || true) \
+ && useradd --create-home --uid 1000 --shell /bin/bash agent \
+ && install -d -o agent -g agent /home/agent/work
+USER agent
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+WORKDIR /home/agent/work
+
+# Data and dependencies come first, in layers that only depend on the files they use, so
+# the ~2 GB download happens once and is reused until scripts/ or package*.json change.
+COPY --chown=agent:agent work/scripts/ /home/agent/work/scripts/
+RUN ./scripts/setup-data.sh
+COPY --chown=agent:agent work/package.json work/package-lock.json /home/agent/work/
+RUN npm install --no-audit --no-fund && npx playwright install chromium
+
+COPY --chown=agent:agent work/ /home/agent/work/
+
+# Untouched copies of everything the agent must not change, for the final test run.
+RUN mkdir -p /home/agent/pristine \
+ && cp -r api tests design scripts package.json package-lock.json /home/agent/pristine/
