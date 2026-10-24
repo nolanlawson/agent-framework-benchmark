@@ -1,0 +1,9 @@
+{
+  "name": "pokedex-benchmark",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup-data": "./scripts/setup-data.sh",
+    "api": "node api/server.mjs"
+  }
+}
