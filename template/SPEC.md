@@ -164,7 +164,8 @@ URLs use API names: species names for Pokémon (`/pokemon/deoxys`, not
   - Default order: `Level Up` by level, then move name; the other tables by move name.
   - Every column header is sortable. Clicking it sorts that table by the column
     (ascending first; a second click flips it). The sorted header has `aria-sort` set to
-    `ascending` or `descending`; the other headers in that table have no `aria-sort`.
+    `ascending` or `descending`; the other headers in that table have no `aria-sort` (or
+    `aria-sort="none"`).
     Missing values sort last in both directions. Sorting doesn't need to be in the URL.
 
 ### `/moves/:name` – Move page
