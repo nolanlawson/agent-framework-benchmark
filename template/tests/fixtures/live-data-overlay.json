@@ -1,0 +1,305 @@
+{
+  "pokemon/25": {
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/stats/0/base_stat",
+        "value": 37
+      }
+    ]
+  },
+  "pokemon-species/1": {
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/genera/7/genus",
+        "value": "Sprout Pokémon"
+      }
+    ]
+  },
+  "move/85": {
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/power",
+        "value": 95
+      }
+    ]
+  },
+  "pokemon-species/": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/results/-",
+        "value": {
+          "name": "benchmon",
+          "url": "/api/v2/pokemon-species/1026/"
+        }
+      }
+    ]
+  },
+  "pokemon/": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/results/1025",
+        "value": {
+          "name": "benchmon",
+          "url": "/api/v2/pokemon/1026/"
+        }
+      }
+    ]
+  },
+  "evolution-chain/": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/results/-",
+        "value": {
+          "url": "/api/v2/evolution-chain/1000/"
+        }
+      }
+    ]
+  },
+  "pokemon-species/1026": {
+    "base": "pokemon-species/132",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/id",
+        "value": 1026
+      },
+      {
+        "op": "replace",
+        "path": "/name",
+        "value": "benchmon"
+      },
+      {
+        "op": "replace",
+        "path": "/order",
+        "value": 1026
+      },
+      {
+        "op": "replace",
+        "path": "/names",
+        "value": [
+          {
+            "name": "Benchmon",
+            "language": {
+              "name": "en",
+              "url": "/api/v2/language/9/"
+            }
+          }
+        ]
+      },
+      {
+        "op": "replace",
+        "path": "/genera",
+        "value": [
+          {
+            "genus": "Benchmark Pokémon",
+            "language": {
+              "name": "en",
+              "url": "/api/v2/language/9/"
+            }
+          }
+        ]
+      },
+      {
+        "op": "replace",
+        "path": "/flavor_text_entries",
+        "value": [
+          {
+            "flavor_text": "It appears only after the app has been built.\nIf you can read this, the app is reading live data.",
+            "language": {
+              "name": "en",
+              "url": "/api/v2/language/9/"
+            },
+            "version": {
+              "name": "scarlet",
+              "url": "/api/v2/version/40/"
+            }
+          }
+        ]
+      },
+      {
+        "op": "replace",
+        "path": "/form_descriptions",
+        "value": []
+      },
+      {
+        "op": "replace",
+        "path": "/pokedex_numbers",
+        "value": [
+          {
+            "entry_number": 1026,
+            "pokedex": {
+              "name": "national",
+              "url": "/api/v2/pokedex/1/"
+            }
+          }
+        ]
+      },
+      {
+        "op": "replace",
+        "path": "/generation",
+        "value": {
+          "name": "generation-ix",
+          "url": "/api/v2/generation/9/"
+        }
+      },
+      {
+        "op": "replace",
+        "path": "/evolution_chain",
+        "value": {
+          "url": "/api/v2/evolution-chain/1000/"
+        }
+      },
+      {
+        "op": "replace",
+        "path": "/varieties",
+        "value": [
+          {
+            "is_default": true,
+            "pokemon": {
+              "name": "benchmon",
+              "url": "/api/v2/pokemon/1026/"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "pokemon/1026": {
+    "base": "pokemon/132",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/id",
+        "value": 1026
+      },
+      {
+        "op": "replace",
+        "path": "/name",
+        "value": "benchmon"
+      },
+      {
+        "op": "replace",
+        "path": "/order",
+        "value": 1026
+      },
+      {
+        "op": "replace",
+        "path": "/species",
+        "value": {
+          "name": "benchmon",
+          "url": "/api/v2/pokemon-species/1026/"
+        }
+      },
+      {
+        "op": "replace",
+        "path": "/forms",
+        "value": []
+      },
+      {
+        "op": "replace",
+        "path": "/game_indices",
+        "value": []
+      },
+      {
+        "op": "replace",
+        "path": "/stats/0/base_stat",
+        "value": 101
+      }
+    ]
+  },
+  "evolution-chain/1000": {
+    "base": "evolution-chain/66",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/id",
+        "value": 1000
+      },
+      {
+        "op": "replace",
+        "path": "/chain/species",
+        "value": {
+          "name": "benchmon",
+          "url": "/api/v2/pokemon-species/1026/"
+        }
+      }
+    ]
+  },
+  "type/1": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/pokemon/-",
+        "value": {
+          "slot": 1,
+          "pokemon": {
+            "name": "benchmon",
+            "url": "/api/v2/pokemon/1026/"
+          }
+        }
+      }
+    ]
+  },
+  "generation/9": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/pokemon_species/-",
+        "value": {
+          "name": "benchmon",
+          "url": "/api/v2/pokemon-species/1026/"
+        }
+      }
+    ]
+  },
+  "ability/7": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/pokemon/-",
+        "value": {
+          "is_hidden": false,
+          "slot": 1,
+          "pokemon": {
+            "name": "benchmon",
+            "url": "/api/v2/pokemon/1026/"
+          }
+        }
+      }
+    ]
+  },
+  "ability/150": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/pokemon/-",
+        "value": {
+          "is_hidden": true,
+          "slot": 3,
+          "pokemon": {
+            "name": "benchmon",
+            "url": "/api/v2/pokemon/1026/"
+          }
+        }
+      }
+    ]
+  },
+  "move/144": {
+    "patch": [
+      {
+        "op": "add",
+        "path": "/learned_by_pokemon/-",
+        "value": {
+          "name": "benchmon",
+          "url": "/api/v2/pokemon/1026/"
+        }
+      }
+    ]
+  }
+}

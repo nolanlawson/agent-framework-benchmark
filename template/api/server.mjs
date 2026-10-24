@@ -8,6 +8,10 @@
 //   PUBLIC_URL  origin used for absolute URLs in responses (default http://localhost:$PORT)
 //   LATENCY_MS  artificial delay added to every /api/v2 response (default 0)
 //   MEDIA_LATENCY_MS  artificial delay added to every /media response (default 0)
+//   API_OVERLAY path to a JSON file of changes applied on top of the data (see
+//               tests/fixtures/live-data-overlay.json). Keys are "<resource>/" for list
+//               endpoints or "<resource>/<id>" for records; values are
+//               { "base"?: "<resource>/<id>", "patch": [JSON Patch add/replace/remove ops] }.
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -59,6 +63,49 @@ for (const resource of fs.readdirSync(API_DIR)) {
 }
 const rootIndex = fs.readFileSync(path.join(API_DIR, 'index.json'), 'utf8');
 
+// Minimal JSON Patch (RFC 6902 add/replace/remove) for the overlay.
+function applyPatch(doc, ops) {
+  for (const { op, path: pointer, value } of ops) {
+    if (pointer === '') {
+      doc = structuredClone(value);
+      continue;
+    }
+    const keys = pointer.split('/').slice(1).map((k) => k.replaceAll('~1', '/').replaceAll('~0', '~'));
+    const last = keys.pop();
+    const parent = keys.reduce((obj, k) => obj[k], doc);
+    if (Array.isArray(parent)) {
+      const i = last === '-' ? parent.length : Number(last);
+      if (op === 'add') parent.splice(i, 0, structuredClone(value));
+      else if (op === 'replace') parent[i] = structuredClone(value);
+      else if (op === 'remove') parent.splice(i, 1);
+    } else if (op === 'remove') delete parent[last];
+    else parent[last] = structuredClone(value);
+  }
+  return doc;
+}
+
+const overlay = process.env.API_OVERLAY ? JSON.parse(fs.readFileSync(process.env.API_OVERLAY, 'utf8')) : {};
+for (const [key, { patch }] of Object.entries(overlay)) {
+  const resource = key.match(/^([a-z-]+)\/$/)?.[1];
+  if (!resource) continue;
+  const results = applyPatch({ results: lists.get(resource) }, patch).results;
+  lists.set(resource, results);
+  for (const entry of results) {
+    const id = entry.url.match(/\/(\d+)\/$/)?.[1];
+    if (entry.name && id) nameToId.get(resource).set(entry.name.toLowerCase(), id);
+  }
+}
+
+async function readRecord(resource, id, sub) {
+  const key = `${resource}/${id}${sub ? `/${sub}` : ''}`;
+  const entry = overlay[key];
+  const file = (k) => path.join(API_DIR, ...k.split('/'), 'index.json');
+  if (!entry) return fsp.readFile(file(key), 'utf8');
+  // Patches apply to "base" if given, otherwise to the record itself.
+  const base = JSON.parse(await fsp.readFile(file(entry.base ?? key), 'utf8'));
+  return JSON.stringify(applyPatch(base, entry.patch ?? []));
+}
+
 // Stored data uses root-relative URLs; the real API returns absolute ones.
 const absolutize = (json) => json.replace(/"\/(api\/v2|media)\//g, `"${PUBLIC_URL}/$1/`);
 
@@ -107,10 +154,10 @@ async function handleApi(res, url) {
 
   const id = /^\d+$/.test(key) ? key : nameToId.get(resource).get(decodeURIComponent(key).toLowerCase());
   if (!id) return notFound(res);
-  const file = path.join(API_DIR, resource, id, ...(sub ? [sub] : []), 'index.json');
   try {
-    sendJson(res, 200, absolutize(await fsp.readFile(file, 'utf8')));
-  } catch {
+    sendJson(res, 200, absolutize(await readRecord(resource, id, sub)));
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
     notFound(res);
   }
 }
@@ -156,5 +203,6 @@ const server = http.createServer(async (req, res) => {
 
 server.keepAliveTimeout = 65_000;
 server.listen(PORT, () => {
-  console.log(`PokeAPI server listening on ${PUBLIC_URL} (latency ${LATENCY_MS}ms api, ${MEDIA_LATENCY_MS}ms media)`);
+  const overlayNote = process.env.API_OVERLAY ? `, overlay ${process.env.API_OVERLAY}` : '';
+  console.log(`PokeAPI server listening on ${PUBLIC_URL} (latency ${LATENCY_MS}ms api, ${MEDIA_LATENCY_MS}ms media${overlayNote})`);
 });
