@@ -212,8 +212,21 @@ with HTTP status 404 is encouraged where your architecture allows it, but isn't 
 ## Look and feel
 
 The app must look like the reference screenshots in `design/screenshots/`. Each page is
-captured at a mobile width (412 px) and a desktop width (1280 px). Match layout, spacing,
-colors and typography closely; pixel-for-pixel equality isn't required.
+captured at a mobile width (412 px, `*-mobile.png`) and a desktop width (1280 px,
+`*-desktop.png`), with long pages cut off at 4000 px. Match layout, spacing, colors and
+typography closely; pixel-for-pixel equality isn't required.
+
+| Screenshot | URL |
+| --- | --- |
+| `home` | `/` |
+| `home-filtered` | `/?type=fire&generation=generation-i` |
+| `pokemon` | `/pokemon/pikachu` |
+| `pokemon-moves` | `/pokemon/pikachu?game=scarlet-violet#moves` (the viewport after jumping to `#moves`) |
+| `move` | `/moves/thunderbolt` |
+| `ability` | `/abilities/static` |
+| `types` | `/types` |
+| `type` | `/types/fire` |
+| `not-found` | `/pokemon/missingno` |
 
 - Use the custom properties in `design/tokens.css` for colors, spacing and type sizes.
   Copy the file into your app or import it, whichever suits your framework.
