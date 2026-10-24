@@ -1,0 +1,9 @@
+{
+  "name": "pokedex-gold",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "true",
+    "start": "node server.mjs"
+  }
+}

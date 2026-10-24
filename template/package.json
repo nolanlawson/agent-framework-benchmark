@@ -4,6 +4,10 @@
   "type": "module",
   "scripts": {
     "setup-data": "./scripts/setup-data.sh",
-    "api": "node api/server.mjs"
+    "api": "node api/server.mjs",
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
   }
 }

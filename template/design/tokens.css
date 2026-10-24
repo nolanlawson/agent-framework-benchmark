@@ -1,0 +1,71 @@
+/* Design tokens for the Pokédex app. Use these custom properties for colors, spacing and
+   type sizes so every implementation looks the same. See design/screenshots/ for how
+   they're applied. */
+:root {
+  /* Typography */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --weight-normal: 400;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* Layout */
+  --content-max-width: 72rem;
+  --header-height: 3.5rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-pill: 999px;
+  --card-min-width: 9.5rem;
+  --sprite-size: 96px;
+  --artwork-size: 18rem;
+
+  /* Colors */
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-text: #1b2230;
+  --color-text-muted: #556070;
+  --color-border: #dde1e8;
+  --color-link: #1d5cc4;
+  --color-accent: #c8102e;
+  --color-on-accent: #ffffff;
+  --color-stat-bar: #3f7de0;
+  --color-stat-track: #e8ebf0;
+  --color-focus: #1d5cc4;
+
+  /* Type badge backgrounds (white text passes WCAG AA on all of them) */
+  --type-normal: #6b6b47;
+  --type-fighting: #a8281f;
+  --type-flying: #5c4fb8;
+  --type-poison: #86338a;
+  --type-ground: #8a6d1f;
+  --type-rock: #7e6b24;
+  --type-bug: #62711a;
+  --type-ghost: #5b4785;
+  --type-steel: #5f6d7e;
+  --type-fire: #c2410c;
+  --type-water: #2a5fc4;
+  --type-grass: #3f7d1f;
+  --type-electric: #8a6a00;
+  --type-psychic: #c0265a;
+  --type-ice: #25777b;
+  --type-dragon: #5228c9;
+  --type-dark: #4f4036;
+  --type-fairy: #a3407a;
+  --color-on-type: #ffffff;
+}
