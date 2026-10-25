@@ -133,7 +133,7 @@ async function timed(flow, page, label, action, until) {
   await flow.startTimespan({ name: label });
   const start = Date.now();
   const t0 = (await action()) ?? start;
-  await page.waitForFunction(until.fn, { timeout: 30_000, polling: 'mutation' }, until.arg);
+  await page.waitForFunction(until.fn, { timeout: 30_000 }, until.arg);
   const ms = Date.now() - t0;
   await new Promise((r) => setTimeout(r, 1000));
   await flow.endTimespan();
