@@ -47,7 +47,7 @@ Agents, and the apps they write, only ever run inside containers.
 | `--claude-version=V` | `2.1.310` | Claude Code version installed in the agent image |
 | `--cpus=N`, `--memory=SIZE` | 4, `8g` | Limits for every container, agent and measurement alike |
 | `--agent-timeout=MIN` | 240 | Stops an agent that runs longer than this |
-| `--lighthouse-runs=N` | 5 | Lighthouse runs per URL and form factor; the median is kept |
+| `--lighthouse-runs=N` | 5 | Lighthouse runs per URL; the median is kept |
 | `--no-cache` | | Rebuild the images from scratch, pulling a fresh Ubuntu image |
 | `--skip-image-build` | | Reuse the existing images |
 | `--no-measure` | | Stop after the agents finish |
