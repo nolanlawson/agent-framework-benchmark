@@ -88,8 +88,9 @@ case "$FRAMEWORK" in
     skill honojs/skills
     ;;
   react-router)
-    # create-react-router adds the official skill itself in non-interactive runs; docs ship
-    # in node_modules/react-router/docs. Nothing to configure up front.
+    # The skill create-react-router copies into new apps (.agents/skills/react-router), installed
+    # up front because agents don't always use create-react-router. Docs ship in node_modules.
+    skill remix-run/react-router --skill react-router
     ;;
   tanstack-start | solidstart | qwik | gracile | vanilla)
     # No official agent tooling (TanStack removed its MCP server in favour of its CLI).

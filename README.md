@@ -125,7 +125,7 @@ get when you pick that framework.
 | Astro | Astro Docs MCP server (`https://mcp.docs.astro.build/mcp`) |
 | SvelteKit | Svelte Claude Code plugin: MCP server, skills, subagent |
 | Angular | Angular CLI MCP server (`ng mcp`), Angular agent skills |
-| React Router | Nothing to set up: `create-react-router` adds its skill; docs ship in `node_modules` |
+| React Router | React Router skill (the one `create-react-router` adds to new apps); docs ship in `node_modules` |
 | Hono + htmx | Hono skills (nothing official for htmx) |
 | TanStack Start, SolidStart, Qwik, Gracile + Lit, vanilla | None |
 
