@@ -73,9 +73,9 @@ case "$FRAMEWORK" in
     # https://svelte.dev/docs/ai/claude-plugin (plugin = local MCP server + skills + subagent).
     # The plugin starts @sveltejs/mcp through npx itself; its version is recorded as resolved now.
     record "$(jq -nc --arg c "$(git_head sveltejs/ai-tools)" --arg mcp "$(npm_version @sveltejs/mcp)" \
-      '{kind: "claude plugin", name: "svelte@ai-tools", repo: "sveltejs/ai-tools", commit: $c, mcpPackage: "@sveltejs/mcp", mcpVersion: $mcp}')"
+      '{kind: "claude plugin", name: "svelte@svelte", repo: "sveltejs/ai-tools", commit: $c, mcpPackage: "@sveltejs/mcp", mcpVersion: $mcp}')"
     claude plugin marketplace add sveltejs/ai-tools
-    claude plugin install svelte@ai-tools
+    claude plugin install svelte@svelte
     ;;
   angular)
     # https://angular.dev/ai/mcp and https://angular.dev/ai/agent-skills
