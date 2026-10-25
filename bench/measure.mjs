@@ -71,11 +71,11 @@ async function runLighthouse() {
   // Lighthouse's default (mobile) settings only. The desktop preset mostly measured the layout
   // shift caused by Linux scrollbars appearing, which macOS users never see.
   for (const [page, urlPath] of Object.entries(LH_URLS)) {
-    // Warm the app's server-side caches right before this URL's runs, so even short-lived caches
-    // are warm: the measured visit is a new user on a site other people already use.
-    for (let i = 0; i < 2; i++) await fetch(`http://localhost:${APP_PORT}${urlPath}`).then((r) => r.arrayBuffer()).catch(() => {});
     const runs = [];
     for (let i = 0; i < RUNS; i++) {
+      // Warm the app's server-side caches right before every run, so even caches that expire
+      // after 30 s are warm: the measured visit is a new user on a site other people already use.
+      for (let j = 0; j < 2; j++) await fetch(`http://localhost:${APP_PORT}${urlPath}`).then((r) => r.arrayBuffer()).catch(() => {});
       const chrome = await chromeLauncher.launch({ chromePath: CHROME, chromeFlags: CHROME_FLAGS });
       try {
         const { lhr } = await lighthouse(APP_ORIGIN + urlPath, {

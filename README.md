@@ -93,7 +93,7 @@ credential. Use a key with a spending limit.
 3. **Measurement.** Each app is built and served in production mode behind Caddy (HTTPS,
    HTTP/2, zstd/gzip), with the API behind Caddy too. Then:
    - **Lighthouse**, mobile settings only, on 6 URLs: the median of N runs, per metric. The
-     app's server-side caches are warmed right before each URL's runs, so each visit is a new
+     app's server-side caches are warmed right before every run, so each visit is a new
      user on a site other people already use. Chrome trusts Caddy's local certificates
      (`--ignore-certificate-errors-spki-list`); ignoring certificate errors instead would
      change its caching and resource priorities.
