@@ -162,7 +162,7 @@ export function writeReport(runDir) {
     ].join('\n');
 
   const versions = iterations
-    .map((it) => `| ${it.dir} | ${it.info.claude_code ?? '—'} | ${it.info.model ?? '—'} | ${it.info.node ?? '—'} | ${it.info.final_test_exit === '0' ? 'pass' : 'FAIL'} | ${it.errors.join('; ') || '—'} |`)
+    .map((it) => `| ${it.dir} | ${it.info.claude_code ?? '—'} | ${it.info.model ?? '—'}${it.info.effort ? ` (${it.info.effort})` : ''} | ${it.info.node ?? '—'} | ${it.info.final_test_exit === '0' ? 'pass' : 'FAIL'} | ${it.errors.join('; ') || '—'} |`)
     .join('\n');
 
   const md = `# Pokédex framework benchmark

@@ -5,12 +5,15 @@
 # Env (set by run.mjs):
 #   FRAMEWORK   framework key (see bench/frameworks.mjs)
 #   PROMPT      the prompt given to Claude Code
-#   MODEL       optional model override
+#   MODEL       model passed to claude --model
+#   EFFORT      effort level passed to claude --effort
 #   ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN
 set -euo pipefail
 
 : "${FRAMEWORK:?FRAMEWORK is required}"
 : "${PROMPT:?PROMPT is required}"
+: "${MODEL:?MODEL is required}"
+: "${EFFORT:?EFFORT is required}"
 OUT=/out
 WORK=/home/agent/work
 mkdir -p "$OUT"
@@ -20,7 +23,8 @@ mkdir -p "$OUT"
 {
   echo "framework=$FRAMEWORK"
   echo "prompt=$PROMPT"
-  echo "model=${MODEL:-default}"
+  echo "model=$MODEL"
+  echo "effort=$EFFORT"
   echo "claude_code=$(claude --version)"
   echo "agent_browser=$(agent-browser --version 2>/dev/null || true)"
   echo "node=$(node --version)"
@@ -30,15 +34,13 @@ mkdir -p "$OUT"
 } > "$OUT/run-info.txt"
 
 cd "$WORK"
-MODEL_ARGS=()
-if [ -n "${MODEL:-}" ]; then MODEL_ARGS=(--model "$MODEL"); fi
 # --strict-mcp-config ignores every MCP server not in mcp.json, including ones that come
 # from plugins, so it's left off for frameworks whose tooling is a plugin.
 STRICT_MCP=(--strict-mcp-config)
 if [ "$FRAMEWORK" = sveltekit ]; then STRICT_MCP=(); fi
 set +e
 claude -p "$PROMPT" \
-  "${MODEL_ARGS[@]}" \
+  --model "$MODEL" --effort "$EFFORT" \
   --mcp-config /home/agent/mcp.json "${STRICT_MCP[@]}" \
   --dangerously-skip-permissions \
   --output-format stream-json --verbose \

@@ -21,8 +21,9 @@
 // Options:
 //   --frameworks=a,b|all    frameworks to test (keys in bench/frameworks.mjs)
 //   --iterations=N          agent runs per framework (default 1)
-//   --model=ID              model passed to `claude --model` (default: Claude Code's default)
-//   --claude-version=V      Claude Code npm version for the agent image (default latest)
+//   --model=ID              model passed to `claude --model` (default claude-opus-5-5)
+//   --effort=LEVEL          effort passed to `claude --effort` (default medium)
+//   --claude-version=V      Claude Code npm version for the agent image (default 2.1.310)
 //   --cpus=N --memory=SIZE  per-container limits (default 4 and 8g)
 //   --agent-timeout=MIN     stop an agent after this many minutes (default 240)
 //   --lighthouse-runs=N     Lighthouse runs per URL and form factor (default 5)
@@ -75,8 +76,9 @@ const config = {
   memory: opts.memory ?? '8g',
   agentTimeoutMin: num('agent-timeout', 240),
   lighthouseRuns: num('lighthouse-runs', 5),
-  model: opts.model ?? null,
-  claudeVersion: opts['claude-version'] ?? 'latest',
+  model: opts.model ?? 'claude-opus-5-5',
+  effort: opts.effort ?? 'medium',
+  claudeVersion: opts['claude-version'] ?? '2.1.310',
 };
 
 // ---------- Helpers ----------
@@ -187,14 +189,15 @@ async function runAgent(runId, iterDir, framework, credential) {
   const args = [
     'run', '--rm', '--name', name, ...containerArgs, ...blockPokeapi,
     '-v', `${out}:/out:Z`,
-    '-e', 'FRAMEWORK', '-e', 'PROMPT', '-e', 'MODEL', '-e', credential,
+    '-e', 'FRAMEWORK', '-e', 'PROMPT', '-e', 'MODEL', '-e', 'EFFORT', '-e', credential,
     IMAGES.agent,
   ];
   const env = {
     ...process.env,
     FRAMEWORK: framework,
     PROMPT: prompt(FRAMEWORKS[framework]),
-    MODEL: config.model ?? '',
+    MODEL: config.model,
+    EFFORT: config.effort,
   };
   log(`Agent start: ${path.basename(iterDir)}`);
   const code = await runLogged('podman', args, path.join(iterDir, 'container.log'), {

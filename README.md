@@ -43,8 +43,9 @@ Agents, and the apps they write, only ever run inside containers.
 | --- | --- | --- |
 | `--frameworks=a,b` or `all` | (required) | Keys from `bench/frameworks.mjs`: `next`, `nuxt`, `tanstack-start`, `react-router`, `solidstart`, `sveltekit`, `angular`, `astro`, `qwik`, `gracile`, `hono-htmx`, `vanilla` |
 | `--iterations=N` | 1 | Agent runs per framework |
-| `--model=ID` | Claude Code's default | Passed to `claude --model`. Pin it for a real run |
-| `--claude-version=V` | `latest` | Claude Code version installed in the agent image. Pin it for a real run |
+| `--model=ID` | `claude-opus-5-5` | Passed to `claude --model` |
+| `--effort=LEVEL` | `medium` | Passed to `claude --effort` (`low`, `medium`, `high`, `xhigh`, `max`) |
+| `--claude-version=V` | `2.1.310` | Claude Code version installed in the agent image |
 | `--cpus=N`, `--memory=SIZE` | 4, `8g` | Limits for every container, agent and measurement alike |
 | `--agent-timeout=MIN` | 240 | Stops an agent that runs longer than this |
 | `--lighthouse-runs=N` | 5 | Lighthouse runs per URL and form factor; the median is kept |
@@ -192,7 +193,7 @@ node measure.mjs ../gold /tmp/gold-results --runs 1 --skip-build   # needs Caddy
 - **Pinned versus recorded.** Node is pinned by `.nvmrc` (a symlink to `template/.nvmrc`);
   the containers install that exact version from nodejs.org, with checksum verification,
   and npm is the version bundled with it. Playwright and agent-browser are pinned in the
-  Containerfiles; pass `--claude-version` and `--model` to pin the agent. Frameworks and
+  Containerfiles; Claude Code, the model and the effort level by `run.mjs`'s defaults. Frameworks and
   their AI tooling are deliberately *not* pinned: each agent uses the latest release, like a
   real user would. Each result is a dated snapshot of the whole ecosystem (model, frameworks,
   tooling, docs, search results), none of which can be frozen for a rerun years later anyway.
