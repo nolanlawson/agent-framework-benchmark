@@ -126,10 +126,6 @@ const DEEP_HELPERS = `
   };
 `;
 
-async function deep(page, fn, arg) {
-  return page.evaluateHandle(fn, arg);
-}
-
 // Latency runs from the start of `action` until `until` holds. An action can return its own
 // start time instead (search starts the clock at the last keystroke, not the first).
 async function timed(flow, page, label, action, until) {
@@ -157,7 +153,7 @@ async function runFlowOnce(i) {
     await flow.navigate(APP_ORIGIN + '/', { name: 'Load home' });
     await page.waitForFunction(() => window.__deep.link('/pokemon/bulbasaur'));
 
-    const search = await deep(page, () => window.__deep.all().find((el) => el.tagName === 'INPUT' && el.type === 'search'));
+    const search = await page.waitForFunction(() => window.__deep.all().find((el) => el.tagName === 'INPUT' && el.type === 'search'));
     latency.search = await timed(
       flow,
       page,
@@ -173,12 +169,13 @@ async function runFlowOnce(i) {
       { fn: () => /(^|\s)7 Pokémon(\s|$)/.test(window.__deep.text()) && window.__deep.link('/pokemon/pecharunt') },
     );
 
-    const card = await deep(page, () => window.__deep.link('/pokemon/charizard'));
+    const card = await page.waitForFunction(() => window.__deep.link('/pokemon/charizard'));
     latency.openPokemon = await timed(flow, page, 'Open Pokémon', () => card.click(), {
       fn: () => window.__deep.h1() === 'Charizard' && /Base stats/.test(window.__deep.text()),
     });
 
-    const header = await deep(page, () =>
+    // Wait for each element: some apps render the moves after the rest of the page.
+    const header = await page.waitForFunction(() =>
       window.__deep.all().find((el) => (el.tagName === 'TH' || el.getAttribute('role') === 'columnheader') && /^\s*Power/.test(el.textContent)),
     );
     await header.evaluate((el) => el.scrollIntoView({ block: 'center' }));
@@ -193,7 +190,7 @@ async function runFlowOnce(i) {
       { fn: () => window.__deep.all().some((el) => el.getAttribute('aria-sort') === 'ascending') },
     );
 
-    const select = await deep(page, () => {
+    const select = await page.waitForFunction(() => {
       const label = window.__deep.all().find((el) => el.tagName === 'LABEL' && el.textContent.trim() === 'Game');
       return label?.control ?? window.__deep.all().find((el) => el.tagName === 'SELECT' && [...el.options].some((o) => o.text.trim() === 'Sword Shield'));
     });
