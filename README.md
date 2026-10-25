@@ -160,6 +160,7 @@ To summarize a single transcript: `node bench/tokens.mjs runs/<id>/<framework>-<
 | `bench/container/` | Containerfiles, the export script, the agent entrypoint and the tooling setup |
 | `bench/measure.mjs`, `stack.mjs`, `screenshots.mjs` | Measurement (run inside `pokedex-measure`) |
 | `bench/report.mjs`, `tokens.mjs` | Report generation |
+| `docs/audits/` | Periodic code audits: findings, and what was decided on each and why. One file per audit, named by date |
 
 ### Working on the harness without Podman
 
