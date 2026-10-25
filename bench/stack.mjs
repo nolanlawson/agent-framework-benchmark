@@ -77,7 +77,7 @@ async function waitFor(url, child, timeoutMs = 60_000) {
 }
 
 // Starts Caddy and the API, installs and builds the app, then starts it.
-// Returns { buildMs, stop }.
+// Returns { chromeCertFlag, stop }.
 export async function startStack(appDir, { build = true } = {}) {
   fs.mkdirSync(CADDY_DIR, { recursive: true });
   const caddyfile = path.join(CADDY_DIR, 'Caddyfile');
@@ -102,7 +102,6 @@ export async function startStack(appDir, { build = true } = {}) {
       NODE_ENV: 'production',
       NODE_EXTRA_CA_CERTS: CADDY_ROOT_CERT,
     };
-    let buildMs = null;
     if (build) {
       const install = spawnSync('npm', ['install', '--no-audit', '--no-fund', '--include=dev'], {
         cwd: appDir,
@@ -110,19 +109,17 @@ export async function startStack(appDir, { build = true } = {}) {
         stdio: 'inherit',
       });
       if (install.status !== 0) throw new Error('npm install failed');
-      const t0 = performance.now();
       const result = spawnSync('npm', ['run', 'build'], { cwd: appDir, env, stdio: 'inherit' });
       if (result.status !== 0) throw new Error('npm run build failed');
-      buildMs = Math.round(performance.now() - t0);
     }
     const app = start('App', 'npm', ['start'], { cwd: appDir, env });
     procs.push(app);
     await waitFor(`http://localhost:${APP_PORT}/`, app);
     // Chrome accepts certificates whose key hash is listed here. Unlike --ignore-certificate-errors,
-    // this keeps its HTTP cache working, so the flow doesn't re-download files a real visitor has.
+    // this keeps Chrome's normal HTTP cache and resource priorities.
     const spki = (file) => crypto.createHash('sha256').update(new crypto.X509Certificate(fs.readFileSync(file)).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
     const chromeCertFlag = `--ignore-certificate-errors-spki-list=${[CADDY_ROOT_CERT, CADDY_INTERMEDIATE_CERT].map(spki).join(',')}`;
-    return { buildMs, chromeCertFlag, stop };
+    return { chromeCertFlag, stop };
   } catch (err) {
     await stop();
     throw err;

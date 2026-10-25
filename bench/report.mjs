@@ -69,15 +69,7 @@ function metrics(it) {
     mobileCls: lh('cls'),
     jsKiB: lh('scriptBytes'),
     a11y: lh('accessibility'),
-    search: m?.flow.latency.search ?? null,
-    open: m?.flow.latency.openPokemon ?? null,
-    sort: m?.flow.latency.sortMoves ?? null,
-    game: m?.flow.latency.changeGame ?? null,
-    inp: m ? Math.max(...Object.values(m.flow.steps).map((s) => s.inp ?? 0)) : null,
-    visual: m?.visual.mean ?? null,
     loc: m?.code.sourceLines ?? null,
-    deps: m ? m.code.dependencies + m.code.devDependencies : null,
-    buildS: m?.buildMs != null ? m.buildMs / 1000 : null,
   };
 }
 
@@ -97,15 +89,7 @@ const COLUMNS = [
   ['CLS', (r) => fmt(r.mobileCls, 3)],
   ['JS (KiB)', (r) => fmt(r.jsKiB, 0, 1 / 1024)],
   ['A11y', (r) => fmt(r.a11y, 0, 100)],
-  ['Search (ms)', (r) => fmt(r.search)],
-  ['Open Pokémon (ms)', (r) => fmt(r.open)],
-  ['Sort (ms)', (r) => fmt(r.sort)],
-  ['Change game (ms)', (r) => fmt(r.game)],
-  ['Max INP (ms)', (r) => fmt(r.inp)],
-  ['Visual match', (r) => fmt(r.visual, 3)],
-  ['LOC', (r) => fmt(r.loc)],
-  ['Deps', (r) => fmt(r.deps)],
-  ['Build (s)', (r) => fmt(r.buildS, 1)],
+  ['Lines of code', (r) => fmt(r.loc)],
 ];
 
 function toolingLabel(t) {
@@ -165,7 +149,8 @@ export function writeReport(runDir) {
 
 Run \`${path.basename(runDir)}\`, started ${config.startedAt ?? '—'}.
 ${config.iterations ?? '?'} iteration(s) per framework; numbers are medians across iterations.
-Lighthouse values are means over 6 URLs, each the median of ${config.lighthouseRuns ?? '?'} runs.
+Lighthouse values are means over 6 URLs of each URL's median over ${config.lighthouseRuns ?? '?'} runs. Medians are
+taken per metric, so one URL's LCP and TBT can come from different runs.
 Sorted by total tokens.
 
 ## Building the app (agent)
@@ -178,17 +163,12 @@ ${table(COLUMNS.slice(0, 8))}
 
 ${table(COLUMNS.slice(8, 15))}
 
-## Interactions (scripted flow, DevTools throttling)
+## Code
 
-Time from the user's action until the result is on screen (for search, from the last keystroke).
+Non-blank lines in the app's source files (comments included). Not counted: JSON, lockfiles,
+tests, generated files, and verbatim copies of the provided design files.
 
-${table(COLUMNS.slice(15, 20))}
-
-## Codebase and fidelity
-
-"Visual match" is the share of pixels that match the reference screenshots (1 = identical).
-
-${table(COLUMNS.slice(20))}
+${table(COLUMNS.slice(15))}
 
 ## Versions
 

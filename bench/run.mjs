@@ -167,7 +167,14 @@ function buildImages(runDir, { agent = true } = {}) {
   else recordImages(runDir, 'measureOnlyImages', [IMAGES.base, IMAGES.measure]);
 }
 
+// The harness commit, and whether the working tree had changes.
+const harnessState = () => ({
+  harnessCommit: spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim(),
+  harnessDirty: spawnSync('git', ['-C', ROOT, 'status', '--porcelain'], { encoding: 'utf8' }).stdout.trim() !== '',
+});
+
 // Adds the image IDs and the Ubuntu base image digest to config.json under `key`.
+// A measure-only run also records the harness that did the measuring.
 function recordImages(runDir, key, images) {
   const inspect = (image, format) =>
     spawnSync('podman', ['image', 'inspect', image, '--format', format], { encoding: 'utf8' }).stdout.trim() || null;
@@ -176,6 +183,7 @@ function recordImages(runDir, key, images) {
   config[key] = {
     ubuntu: inspect('docker.io/library/ubuntu:24.04', '{{.Digest}}'),
     ...Object.fromEntries(images.map((image) => [image, inspect(image, '{{.Id}}')])),
+    ...(key === 'measureOnlyImages' ? { ...harnessState(), measuredAt: new Date().toISOString() } : {}),
   };
   fs.writeFileSync(file, JSON.stringify(config, null, 2));
 }
@@ -324,8 +332,6 @@ async function main() {
   const runId = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
   const runDir = path.resolve(opts.out ?? path.join(ROOT, 'runs'), runId);
   fs.mkdirSync(runDir, { recursive: true });
-  const harnessCommit = spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
-  const harnessDirty = spawnSync('git', ['-C', ROOT, 'status', '--porcelain'], { encoding: 'utf8' }).stdout.trim() !== '';
   fs.writeFileSync(
     path.join(runDir, 'config.json'),
     JSON.stringify(
@@ -335,8 +341,7 @@ async function main() {
         prompts: Object.fromEntries(frameworks.map((f) => [f, prompt(FRAMEWORKS[f])])),
         startedAt: new Date().toISOString(),
         nodeVersion: NODE_VERSION,
-        harnessCommit,
-        harnessDirty,
+        ...harnessState(),
         podman: podmanVersion,
         host: { platform: os.platform(), release: os.release(), cpus: os.cpus()[0]?.model, cores: os.cpus().length, memoryGiB: Math.round(os.totalmem() / 2 ** 30) },
       },

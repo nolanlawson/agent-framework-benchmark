@@ -6,8 +6,7 @@ non-trivial web app in different frameworks? And how fast is the app it builds?
 Each agent gets the same spec (a Pokédex backed by a local copy of PokeAPI), the same
 tests, the same tools and the same one-line prompt. The only difference is the framework
 it's told to use. Each agent runs alone in a fresh Podman container. Afterwards, the
-app it built is measured in another container with Lighthouse, a scripted user flow and a
-screenshot comparison.
+app it built is measured in another container with Lighthouse.
 
 ## Quick start
 
@@ -93,14 +92,14 @@ credential. Use a key with a spending limit.
    - `pokeapi.co` resolves to localhost, so the app can only use the local API.
 3. **Measurement.** Each app is built and served in production mode behind Caddy (HTTPS,
    HTTP/2, zstd/gzip), with the API behind Caddy too. Then:
-   - **Lighthouse**, mobile settings only, on 6 URLs: the median of N runs. Server-side
-     caches are warmed first, so each visit is a new user on a site other people already use.
-   - **A scripted user flow** under DevTools throttling: type in search, open a Pokémon, sort
-     the moves table, change the game. It records the time from each action until the result is
-     on screen (for search, from the last keystroke), plus INP and TBT.
+   - **Lighthouse**, mobile settings only, on 6 URLs: the median of N runs, per metric. The
+     app's server-side caches are warmed right before each URL's runs, so each visit is a new
+     user on a site other people already use. Chrome trusts Caddy's local certificates
+     (`--ignore-certificate-errors-spki-list`); ignoring certificate errors instead would
+     change its caching and resource priorities.
    - Apps that failed the final tests are skipped unless you pass `--measure-failed`.
-   - **Visual match**: the share of pixels that agree with the reference screenshots.
-   - **Code stats**: lines of code, dependency count, build time.
+   - **Lines of code**: non-blank lines in the app's source files (comments included), not
+     counting JSON, lockfiles, tests, generated files, or copies of the provided design files.
 4. **Report.** `bench/report.mjs` writes `report.md` and `summary.json`. With several
    iterations, each framework's numbers are medians across them.
 
@@ -114,20 +113,27 @@ The same for every agent, apart from the framework label in `bench/frameworks.mj
 ### Per-framework AI tooling
 
 Each agent gets what that framework's official docs recommend for coding agents (checked
-October 2026), installed by `bench/container/setup-tooling.sh`. Frameworks with no official
-tooling get nothing extra. Uneven tooling is part of what's being measured: it's what you
-get when you pick that framework.
+October 2026), installed up front by `bench/container/setup-tooling.sh`. Frameworks with no
+official tooling get nothing extra. Uneven tooling is part of what's being measured: it's what
+you get when you pick that framework.
+
+Some tooling only arrives through a framework's project generator, which an agent may skip
+(our agents usually wrote `package.json` by hand). Where that tooling can be installed up
+front, it is (React Router's skill). Next.js doesn't need it: `next dev` writes its `AGENTS.md`
+when it detects a coding agent. TanStack can't be: see the table. Agents are never told to use
+the tooling; whether they do is recorded (MCP and skill calls are in the transcripts).
 
 | Framework | Tooling |
 | --- | --- |
-| Next.js | `next-devtools-mcp`, `next-dev-loop` skill; `create-next-app` writes `AGENTS.md` and docs ship in `node_modules` |
+| Next.js | `next-devtools-mcp`, `next-dev-loop` skill; docs ship in `node_modules`, and `create-next-app` or `next dev` writes an `AGENTS.md` pointing to them. Next's task-specific skills (migrations, bundle analysis) aren't installed |
 | Nuxt | Nuxt MCP server (`https://nuxt.com/mcp`) |
 | Astro | Astro Docs MCP server (`https://mcp.docs.astro.build/mcp`) |
 | SvelteKit | Svelte Claude Code plugin: MCP server, skills, subagent |
 | Angular | Angular CLI MCP server (`ng mcp`), Angular agent skills |
 | React Router | React Router skill (the one `create-react-router` adds to new apps); docs ship in `node_modules` |
 | Hono + htmx | Hono skills (nothing official for htmx) |
-| TanStack Start, SolidStart, Qwik, Gracile + Lit, vanilla | None |
+| TanStack Start | None. Its packages ship skills in `node_modules` (TanStack Intent), and `@tanstack/cli create` tries to wire them up, but that step needs an interactive terminal and fails in non-interactive use. Start's docs don't mention them |
+| SolidStart, Qwik, Gracile + Lit, vanilla | None (only community-made tooling exists) |
 
 ## Reading a run
 
@@ -144,8 +150,7 @@ For each iteration, `runs/<id>/<framework>-<n>/` contains:
 | `container.log` | Podman output for the agent container |
 | `repo/` | The agent's repo; the app is in `repo/app/` |
 | `measure/results.json` | Every measurement, including raw runs |
-| `measure/lighthouse/` | Lighthouse reports (first run of each URL) and the flow report |
-| `measure/screenshots/` | Screenshots to compare with `template/design/screenshots/` |
+| `measure/lighthouse/` | Lighthouse reports (first run of each URL) |
 | `measure/error.txt` | Why measurement failed, if it did |
 
 To summarize a single transcript: `node bench/tokens.mjs runs/<id>/<framework>-<n>/agent/transcript.jsonl`.
@@ -159,7 +164,8 @@ To summarize a single transcript: `node bench/tokens.mjs runs/<id>/<framework>-<
 | `gold/` | Dependency-free reference implementation. It produced `template/design/screenshots/` and is used to check the tests (`APP_DIR=../gold npm test` in `template/`). Agents never see it |
 | `bench/run.mjs` | The orchestrator |
 | `bench/container/` | Containerfiles, the export script, the agent entrypoint and the tooling setup |
-| `bench/measure.mjs`, `stack.mjs`, `screenshots.mjs` | Measurement (run inside `pokedex-measure`) |
+| `bench/measure.mjs`, `stack.mjs` | Measurement (run inside `pokedex-measure`) |
+| `bench/screenshots.mjs` | Captures the reference screenshots from `gold/` |
 | `bench/report.mjs`, `tokens.mjs` | Report generation |
 | `docs/audits/` | Periodic code audits: findings, and what was decided on each and why. One file per audit, named by date |
 
@@ -183,13 +189,13 @@ node measure.mjs ../gold /tmp/gold-results --runs 1 --skip-build   # needs Caddy
   throttling, but an MPA server's calls to the API run at localhost speed, like an app server
   sitting next to its API. Keep this in mind when comparing SPAs with MPAs.
 - **The site is content-heavy**, which favors server-rendered MPAs on first-load metrics.
-  The interaction flow (search, sorting, client navigation) is where SPAs can win back ground.
+- **Only page loads are measured.** Interactions after the page loads (search, sorting,
+  client-side navigation), where SPAs can win back ground, aren't. An earlier version timed a
+  scripted flow, but the timings mostly reflected debounce settings, round trips and harness
+  overhead (see `docs/audits/2026-10-25.md`).
 - **Styling is constrained**: shared design tokens, system fonts, no CSS frameworks or
   component libraries, no animations. This keeps visual and CSS differences from dominating
   the results.
-- **"Change game" has no INP.** A native `<select>` can't be operated by a real interaction
-  in headless Chrome, so the flow sets the value and dispatches the events itself. Its
-  latency is still measured.
 - **Pinned versus recorded.** Node is pinned by `.nvmrc` (a symlink to `template/.nvmrc`);
   the containers install that exact version from nodejs.org, with checksum verification,
   and npm is the version bundled with it. Playwright and agent-browser are pinned in the
