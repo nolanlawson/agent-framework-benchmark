@@ -24,7 +24,7 @@ export CLAUDE_CODE_OAUTH_TOKEN=...      # or ANTHROPIC_API_KEY=...
 node bench/run.mjs --frameworks=vanilla --iterations=1
 
 # Everything
-node bench/run.mjs --frameworks=all --iterations=3 --parallel=2
+node bench/run.mjs --frameworks=all --iterations=3
 ```
 
 The run creates `runs/<timestamp>/`, and the results end up in `runs/<timestamp>/report.md`.
@@ -43,7 +43,6 @@ Agents, and the apps they write, only ever run inside containers.
 | --- | --- | --- |
 | `--frameworks=a,b` or `all` | (required) | Keys from `bench/frameworks.mjs`: `next`, `nuxt`, `tanstack-start`, `react-router`, `solidstart`, `sveltekit`, `angular`, `astro`, `qwik`, `gracile`, `hono-htmx`, `vanilla` |
 | `--iterations=N` | 1 | Agent runs per framework |
-| `--parallel=N` | 1 | Agent containers running at once. Measurement always runs one at a time |
 | `--model=ID` | Claude Code's default | Passed to `claude --model`. Pin it for a real run |
 | `--claude-version=V` | `latest` | Claude Code version installed in the agent image. Pin it for a real run |
 | `--cpus=N`, `--memory=SIZE` | 4, `8g` | Limits for every container, agent and measurement alike |
@@ -52,19 +51,23 @@ Agents, and the apps they write, only ever run inside containers.
 | `--no-cache` | | Rebuild the images from scratch, pulling a fresh Ubuntu image |
 | `--skip-image-build` | | Reuse the existing images |
 | `--no-measure` | | Stop after the agents finish |
-| `--measure-only=runs/<id>` | | Measure an earlier run again and rewrite its report |
+| `--measure-failed` | | Also measure apps that failed the final tests. By default they're skipped, so broken apps don't get performance numbers |
+| `--measure-only=runs/<id>` | | Measure an earlier run again and rewrite its report. Rebuilds only the base and measure images, and records them as `measureOnlyImages` in `config.json` |
 | `--report-only=runs/<id>` | | Only rewrite `report.md` |
 | `--out=DIR` | `runs` | Where run directories go |
 
 ### Credentials
 
-`run.mjs` looks for `ANTHROPIC_API_KEY`, then `CLAUDE_CODE_OAUTH_TOKEN`, then the contents of
-`~/.claude/.credentials.json`. Whichever it finds is passed to each container as an
-environment variable. It never goes on a command line or into the run directory.
+`run.mjs` looks for `ANTHROPIC_API_KEY`, then `CLAUDE_CODE_OAUTH_TOKEN` (create one with
+`claude setup-token`). Whichever it finds is passed to each agent container as an environment
+variable. It never goes on a command line or into the run directory.
 
-Prefer `claude setup-token` over the credentials file. The file holds an OAuth refresh token.
-If a container refreshes it, the copy on your host (and in other containers running in
-parallel) can stop working.
+Your normal login in `~/.claude/.credentials.json` isn't used: its refresh token is replaced
+whenever it's used, so a copy handed to one container would stop working for the next one,
+and for you.
+
+The agent, and anything it runs (npm install scripts, MCP servers), can read the
+credential. Use a key with a spending limit.
 
 ## What happens in a run
 
@@ -77,12 +80,15 @@ parallel) can stop working.
      rewrites media URLs to point at the local API server.
    - **`pokedex-agent`**: adds Claude Code and `agent-browser`, and sets `IS_SANDBOX=1`.
    - **`pokedex-measure`**: adds Caddy and the measurement scripts.
-2. **Agents.** For each framework and iteration, `run-agent.sh` runs in a new agent container:
+2. **Agents.** For each framework and iteration, one at a time, `run-agent.sh` runs in a new
+   agent container:
    - It installs the framework's official AI tooling (see below).
    - It runs `claude -p "<prompt>" --dangerously-skip-permissions --output-format stream-json`,
      with no other MCP servers.
-   - When the agent stops, it restores the original `tests/`, `api/` and `design/`, runs
-     `npm test`, and saves the agent's repo.
+   - When the agent stops, it saves the agent's repo.
+   - Then the agent's `app/`, and only that, is copied into a fresh `pokedex-base` container,
+     where `npm test` runs. Whatever else the agent changed (tests, data, `node_modules`) or
+     left running can't affect the result.
    - `pokeapi.co` resolves to localhost, so the app can only use the local API.
 3. **Measurement.** Each app is built and served in production mode behind Caddy (HTTPS,
    HTTP/2, zstd/gzip), with the API behind Caddy too. Then:
@@ -90,7 +96,8 @@ parallel) can stop working.
      caches are warmed first, so each visit is a new user on a site other people already use.
    - **A scripted user flow** under DevTools throttling: type in search, open a Pokémon, sort
      the moves table, change the game. It records the time from each action until the result is
-     on screen, plus INP and TBT.
+     on screen (for search, from the last keystroke), plus INP and TBT.
+   - Apps that failed the final tests are skipped unless you pass `--measure-failed`.
    - **Visual match**: the share of pixels that agree with the reference screenshots.
    - **Code stats**: lines of code, dependency count, build time.
 4. **Report.** `bench/report.mjs` writes `report.md` and `summary.json`. With several
@@ -128,8 +135,8 @@ For each iteration, `runs/<id>/<framework>-<n>/` contains:
 | Path | What it is |
 | --- | --- |
 | `agent/transcript.jsonl` | The agent's full session (Claude Code stream-json) |
-| `agent/run-info.txt` | Versions, start and finish times, and the exit codes of `claude` and the final `npm test` |
-| `agent/final-test.log` | The final test run, against the original tests |
+| `agent/run-info.txt` | Versions, start and finish times, the MCP servers the session had (`mcp_servers`), and the exit codes of `claude` and the final `npm test` |
+| `agent/final-test.log` | The final test run: the original tests, in a fresh container with only the agent's `app/` |
 | `agent/tooling.log` | Output of `setup-tooling.sh` |
 | `agent/tooling-versions.json` | Exact versions or commits of the MCP servers, skills and plugins the agent had |
 | `agent/git-status.txt` | Files the agent changed or added |

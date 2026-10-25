@@ -43,7 +43,3 @@ COPY --chown=agent:agent work/package.json work/package-lock.json work/.nvmrc /h
 RUN npm install --no-audit --no-fund && npx playwright install chromium
 
 COPY --chown=agent:agent work/ /home/agent/work/
-
-# Untouched copies of everything the agent must not change, for the final test run.
-RUN mkdir -p /home/agent/pristine \
- && cp -r api tests design scripts package.json package-lock.json /home/agent/pristine/

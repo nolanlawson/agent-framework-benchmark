@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Container entrypoint: runs one agent on the spec, then checks its work with the
-# pristine tests. Everything lands in /out. Started by bench/run.mjs.
+# Container entrypoint: runs one agent on the spec and saves its repo. Everything lands in
+# /out. Started by bench/run.mjs, which then runs the tests in a separate container.
 #
 # Env (set by run.mjs):
 #   FRAMEWORK   framework key (see bench/frameworks.mjs)
 #   PROMPT      the prompt given to Claude Code
 #   MODEL       optional model override
-#   ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or HOST_CLAUDE_CREDENTIALS (the contents
-#   of the host's ~/.claude/.credentials.json)
+#   ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN
 set -euo pipefail
 
 : "${FRAMEWORK:?FRAMEWORK is required}"
@@ -15,12 +14,6 @@ set -euo pipefail
 OUT=/out
 WORK=/home/agent/work
 mkdir -p "$OUT"
-
-if [ -n "${HOST_CLAUDE_CREDENTIALS:-}" ]; then
-  mkdir -p ~/.claude
-  (umask 077 && printf '%s' "$HOST_CLAUDE_CREDENTIALS" > ~/.claude/.credentials.json)
-  unset HOST_CLAUDE_CREDENTIALS
-fi
 
 /home/agent/setup-tooling.sh "$FRAMEWORK" /home/agent/mcp.json "$OUT/tooling-versions.json" > "$OUT/tooling.log" 2>&1
 
@@ -39,25 +32,24 @@ fi
 cd "$WORK"
 MODEL_ARGS=()
 if [ -n "${MODEL:-}" ]; then MODEL_ARGS=(--model "$MODEL"); fi
+# --strict-mcp-config ignores every MCP server not in mcp.json, including ones that come
+# from plugins, so it's left off for frameworks whose tooling is a plugin.
+STRICT_MCP=(--strict-mcp-config)
+if [ "$FRAMEWORK" = sveltekit ]; then STRICT_MCP=(); fi
 set +e
 claude -p "$PROMPT" \
   "${MODEL_ARGS[@]}" \
-  --mcp-config /home/agent/mcp.json --strict-mcp-config \
+  --mcp-config /home/agent/mcp.json "${STRICT_MCP[@]}" \
   --dangerously-skip-permissions \
   --output-format stream-json --verbose \
   > "$OUT/transcript.jsonl" 2> "$OUT/claude-stderr.log"
 echo "claude_exit=$?" >> "$OUT/run-info.txt"
+# The MCP servers the session actually had, from its init event, as name:status pairs.
+echo "mcp_servers=$(jq -rR 'fromjson? | select(.type == "system" and .subtype == "init") | [.mcp_servers[]? | "\(.name):\(.status)"] | join(",")' "$OUT/transcript.jsonl" 2>/dev/null | head -n 1)" >> "$OUT/run-info.txt"
 set -e
 echo "finished=$(date -u +%FT%TZ)" >> "$OUT/run-info.txt"
 
-# Final check: restore everything the agent must not change, then run the tests.
-cp -r /home/agent/pristine/. "$WORK/"
-set +e
-npm test > "$OUT/final-test.log" 2>&1
-echo "final_test_exit=$?" >> "$OUT/run-info.txt"
-set -e
-
-# Keep the agent's repo (without dependencies or data) for measurement on the host.
+# Keep the agent's repo (without dependencies or data) for testing and measurement.
 git -C "$WORK" status --short > "$OUT/git-status.txt" || true
 tar --exclude=node_modules --exclude=./data --exclude=./.data-cache --exclude=./test-results \
   -czf "$OUT/repo.tar.gz" -C "$WORK" .

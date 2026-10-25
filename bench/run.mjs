@@ -4,9 +4,10 @@
 //   1. Builds three images from scratch: pokedex-base (Ubuntu, Node, Chromium, the exported
 //      template repo and its data), pokedex-agent (+ Claude Code, agent-browser) and
 //      pokedex-measure (+ Caddy, Lighthouse and the measurement scripts).
-//   2. For every framework x iteration, runs one agent in its own pokedex-agent container.
-//      The agent gets the prompt from frameworks.mjs and nothing else. When it stops, the
-//      container restores the original tests and runs them.
+//   2. For every framework x iteration, one at a time, runs one agent in its own
+//      pokedex-agent container. The agent gets the prompt from frameworks.mjs and nothing
+//      else. When it stops, the original tests run against its app/ in a fresh pokedex-base
+//      container, so nothing else the agent changed can affect them.
 //   3. Measures each agent's app, one at a time, in a pokedex-measure container.
 //   4. Writes runs/<id>/report.md.
 //
@@ -20,7 +21,6 @@
 // Options:
 //   --frameworks=a,b|all    frameworks to test (keys in bench/frameworks.mjs)
 //   --iterations=N          agent runs per framework (default 1)
-//   --parallel=N            agent containers at once (default 1); measurement is always serial
 //   --model=ID              model passed to `claude --model` (default: Claude Code's default)
 //   --claude-version=V      Claude Code npm version for the agent image (default latest)
 //   --cpus=N --memory=SIZE  per-container limits (default 4 and 8g)
@@ -29,12 +29,12 @@
 //   --no-cache              rebuild images without Podman's layer cache (pulls fresh base)
 //   --skip-image-build      reuse existing images
 //   --no-measure            stop after the agent runs
+//   --measure-failed        also measure apps that failed the final tests (skipped by default)
 //   --out=DIR               where run directories go (default ./runs)
 //
-// Credentials, in order of preference: ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN from
-// the environment (`claude setup-token` creates the latter), otherwise the contents of
-// ~/.claude/.credentials.json. They're handed to containers through an environment
-// variable, never written to the run directory.
+// Credentials: ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) in
+// the environment. It's handed to the agent containers as an environment variable, never
+// written to the run directory.
 
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -42,7 +42,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FRAMEWORKS, prompt } from './frameworks.mjs';
-import { writeReport } from './report.mjs';
+import { readRunInfo, writeReport } from './report.mjs';
 
 const BENCH = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(BENCH, '..');
@@ -71,7 +71,6 @@ const num = (key, fallback) => {
 };
 const config = {
   iterations: num('iterations', 1),
-  parallel: num('parallel', 1),
   cpus: num('cpus', 4),
   memory: opts.memory ?? '8g',
   agentTimeoutMin: num('agent-timeout', 240),
@@ -115,6 +114,10 @@ const writableDir = (dir) => {
   fs.mkdirSync(dir, { recursive: true });
   if (rootful) fs.chmodSync(dir, 0o777);
 };
+// Flags for every container: user mapping and resource limits.
+const containerArgs = [...userns, `--cpus=${config.cpus}`, `--memory=${config.memory}`];
+// Agents must use the local API, so the real one is unreachable when they build and test.
+const blockPokeapi = ['--add-host=pokeapi.co:127.0.0.1', '--add-host=www.pokeapi.co:127.0.0.1'];
 
 function preflight() {
   const major = Number(process.versions.node.split('.')[0]);
@@ -127,19 +130,19 @@ function preflight() {
   return podman.stdout.trim();
 }
 
-function credentialsEnv() {
-  if (process.env.ANTHROPIC_API_KEY) return { name: 'ANTHROPIC_API_KEY', env: {} };
-  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) return { name: 'CLAUDE_CODE_OAUTH_TOKEN', env: {} };
-  const file = path.join(os.homedir(), '.claude', '.credentials.json');
-  if (fs.existsSync(file)) {
-    return { name: 'HOST_CLAUDE_CREDENTIALS', env: { HOST_CLAUDE_CREDENTIALS: fs.readFileSync(file, 'utf8') } };
-  }
-  throw new Error('No Claude credentials: set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN, or log in with `claude` first');
+// Returns the name of the environment variable holding the credentials. Not the
+// ~/.claude/.credentials.json login: its refresh token is replaced whenever it's used, so a
+// copy handed to one container stops working for the next.
+function credentialName() {
+  for (const name of ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN']) if (process.env[name]) return name;
+  throw new Error('No Claude credentials: set ANTHROPIC_API_KEY, or CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`');
 }
 
 // ---------- Step 1: images ----------
 
-function buildImages(runDir) {
+// --measure-only passes agent: false, so it doesn't rebuild the agent image or overwrite the
+// record of the images the agents ran in.
+function buildImages(runDir, { agent = true } = {}) {
   const ctx = path.join(runDir, '.build');
   fs.rmSync(ctx, { recursive: true, force: true });
   fs.mkdirSync(ctx, { recursive: true });
@@ -150,46 +153,45 @@ function buildImages(runDir) {
     sh('podman', ['build', ...cacheArgs, '-t', image, '-f', file, ...buildArgs, context]);
   };
   build(IMAGES.base, path.join(BENCH, 'container/Containerfile.base'), ctx, ['--build-arg', `NODE_VERSION=${NODE_VERSION}`]);
-  build(IMAGES.agent, path.join(BENCH, 'container/Containerfile.agent'), path.join(BENCH, 'container'), [
-    '--build-arg', `BASE=${IMAGES.base}`,
-    '--build-arg', `CLAUDE_CODE_VERSION=${config.claudeVersion}`,
-  ]);
+  if (agent) {
+    build(IMAGES.agent, path.join(BENCH, 'container/Containerfile.agent'), path.join(BENCH, 'container'), [
+      '--build-arg', `BASE=${IMAGES.base}`,
+      '--build-arg', `CLAUDE_CODE_VERSION=${config.claudeVersion}`,
+    ]);
+  }
   build(IMAGES.measure, path.join(BENCH, 'container/Containerfile.measure'), BENCH, ['--build-arg', `BASE=${IMAGES.base}`]);
   fs.rmSync(ctx, { recursive: true, force: true });
-  recordImages(runDir);
+  if (agent) recordImages(runDir, 'images', Object.values(IMAGES));
+  else recordImages(runDir, 'measureOnlyImages', [IMAGES.base, IMAGES.measure]);
 }
 
-// Adds the image IDs and the Ubuntu base image digest to config.json.
-function recordImages(runDir) {
+// Adds the image IDs and the Ubuntu base image digest to config.json under `key`.
+function recordImages(runDir, key, images) {
   const inspect = (image, format) =>
     spawnSync('podman', ['image', 'inspect', image, '--format', format], { encoding: 'utf8' }).stdout.trim() || null;
   const file = path.join(runDir, 'config.json');
   const config = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
-  config.images = {
+  config[key] = {
     ubuntu: inspect('docker.io/library/ubuntu:24.04', '{{.Digest}}'),
-    ...Object.fromEntries(Object.values(IMAGES).map((image) => [image, inspect(image, '{{.Id}}')])),
+    ...Object.fromEntries(images.map((image) => [image, inspect(image, '{{.Id}}')])),
   };
   fs.writeFileSync(file, JSON.stringify(config, null, 2));
 }
 
 // ---------- Step 2: agents ----------
 
-async function runAgent(runId, iterDir, framework, credentials) {
+async function runAgent(runId, iterDir, framework, credential) {
   const out = path.join(iterDir, 'agent');
   writableDir(out);
   const name = `pokedex-${runId}-${path.basename(iterDir)}`;
   const args = [
-    'run', '--rm', '--name', name, ...userns,
-    `--cpus=${config.cpus}`, `--memory=${config.memory}`,
-    // Agents must use the local API, so the real one is unreachable.
-    '--add-host=pokeapi.co:127.0.0.1', '--add-host=www.pokeapi.co:127.0.0.1',
+    'run', '--rm', '--name', name, ...containerArgs, ...blockPokeapi,
     '-v', `${out}:/out:Z`,
-    '-e', 'FRAMEWORK', '-e', 'PROMPT', '-e', 'MODEL', '-e', credentials.name,
+    '-e', 'FRAMEWORK', '-e', 'PROMPT', '-e', 'MODEL', '-e', credential,
     IMAGES.agent,
   ];
   const env = {
     ...process.env,
-    ...credentials.env,
     FRAMEWORK: framework,
     PROMPT: prompt(FRAMEWORKS[framework]),
     MODEL: config.model ?? '',
@@ -207,22 +209,47 @@ async function runAgent(runId, iterDir, framework, credentials) {
   log(`Agent done:  ${path.basename(iterDir)} (container exit ${code})`);
 }
 
-async function runAgents(runId, runDir, frameworks) {
-  const credentials = credentialsEnv();
-  const queue = frameworks.flatMap((fw) =>
-    Array.from({ length: config.iterations }, (_, i) => ({ fw, dir: path.join(runDir, `${fw}-${i + 1}`) })),
+// Unpacks the agent's repo into <iterDir>/repo, replacing anything left from before.
+function extractRepo(iterDir) {
+  const repo = path.join(iterDir, 'repo');
+  fs.rmSync(repo, { recursive: true, force: true });
+  fs.mkdirSync(repo);
+  sh('tar', ['-xzf', path.join(iterDir, 'agent/repo.tar.gz'), '-C', repo]);
+  if (rootful) sh('chmod', ['-R', 'a+rwX', repo]);
+  return repo;
+}
+
+// Runs the original tests against the agent's app/ in a fresh pokedex-base container. Only
+// app/ is copied in, so changes to tests/, data/ or node_modules, or servers the agent left
+// running, can't affect the result. Appends final_test_exit to agent/run-info.txt.
+async function testApp(iterDir) {
+  if (!fs.existsSync(path.join(iterDir, 'agent/repo.tar.gz'))) return;
+  const app = path.join(extractRepo(iterDir), 'app');
+  fs.mkdirSync(app, { recursive: true }); // without an app, the tests fail with "No app found"
+  log(`Tests start: ${path.basename(iterDir)}`);
+  const code = await runLogged(
+    'podman',
+    ['run', '--rm', ...containerArgs, ...blockPokeapi, '-v', `${app}:/src:ro,Z`, IMAGES.base, 'bash', '-c', 'cp -r /src app && npm test'],
+    path.join(iterDir, 'agent/final-test.log'),
   );
-  const workers = Array.from({ length: Math.min(config.parallel, queue.length) }, async () => {
-    for (let job = queue.shift(); job; job = queue.shift()) await runAgent(runId, job.dir, job.fw, credentials);
-  });
-  await Promise.all(workers);
+  fs.appendFileSync(path.join(iterDir, 'agent/run-info.txt'), `final_test_exit=${code}\n`);
+  log(`Tests done:  ${path.basename(iterDir)} (${code === 0 ? 'pass' : `fail, exit ${code}`})`);
+}
+
+async function runAgents(runId, runDir, frameworks, credential) {
+  for (const fw of frameworks) {
+    for (let i = 1; i <= config.iterations; i++) {
+      const dir = path.join(runDir, `${fw}-${i}`);
+      await runAgent(runId, dir, fw, credential);
+      await testApp(dir);
+    }
+  }
 }
 
 // ---------- Step 3: measurement ----------
 
 async function measure(iterDir) {
   const tarball = path.join(iterDir, 'agent/repo.tar.gz');
-  const repo = path.join(iterDir, 'repo');
   const results = path.join(iterDir, 'measure');
   fs.rmSync(results, { recursive: true, force: true });
   writableDir(results);
@@ -231,17 +258,18 @@ async function measure(iterDir) {
     log(`Measure failed: ${path.basename(iterDir)}: ${msg}`);
   };
   if (!fs.existsSync(tarball)) return fail('no repo.tar.gz (the agent run did not finish)');
-  fs.rmSync(repo, { recursive: true, force: true });
-  fs.mkdirSync(repo);
-  sh('tar', ['-xzf', tarball, '-C', repo]);
-  if (rootful) sh('chmod', ['-R', 'a+rwX', repo]);
+  // A broken app can score well on page loads (an empty page is fast), so by default only
+  // apps that pass the tests get performance numbers.
+  const testExit = readRunInfo(path.join(iterDir, 'agent/run-info.txt')).final_test_exit;
+  if (testExit !== '0' && !opts['measure-failed']) return fail(`skipped: final tests failed (exit ${testExit ?? '?'}); use --measure-failed to measure anyway`);
+  const repo = extractRepo(iterDir); // fresh: measuring installs and builds in place
   if (!fs.existsSync(path.join(repo, 'app/package.json'))) return fail('no app/package.json');
 
   log(`Measure start: ${path.basename(iterDir)}`);
   const code = await runLogged(
     'podman',
     [
-      'run', '--rm', ...userns, `--cpus=${config.cpus}`, `--memory=${config.memory}`,
+      'run', '--rm', ...containerArgs,
       '-v', `${repo}:/repo:Z`, '-v', `${results}:/results:Z`,
       IMAGES.measure, '/repo/app', '/results', '--runs', String(config.lighthouseRuns),
     ],
@@ -277,7 +305,7 @@ async function main() {
 
   if (opts['measure-only']) {
     const runDir = path.resolve(opts['measure-only']);
-    if (!opts['skip-image-build']) buildImages(runDir);
+    if (!opts['skip-image-build']) buildImages(runDir, { agent: false });
     await measureAll(runDir);
     writeReport(runDir);
     log(`Report: ${path.join(runDir, 'report.md')}`);
@@ -288,6 +316,7 @@ async function main() {
   const frameworks = opts.frameworks === 'all' ? Object.keys(FRAMEWORKS) : String(opts.frameworks).split(',').map((s) => s.trim());
   const unknown = frameworks.filter((f) => !FRAMEWORKS[f]);
   if (unknown.length) throw new Error(`Unknown framework(s): ${unknown.join(', ')}. Choose from: ${Object.keys(FRAMEWORKS).join(', ')}`);
+  const credential = credentialName();
 
   const runId = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
   const runDir = path.resolve(opts.out ?? path.join(ROOT, 'runs'), runId);
@@ -315,7 +344,7 @@ async function main() {
   log(`Run ${runId}: ${frameworks.join(', ')} x ${config.iterations} -> ${runDir}`);
 
   if (!opts['skip-image-build']) buildImages(runDir);
-  await runAgents(runId, runDir, frameworks);
+  await runAgents(runId, runDir, frameworks, credential);
   if (!opts['no-measure']) await measureAll(runDir);
   writeReport(runDir);
   log(`Report: ${path.join(runDir, 'report.md')}`);

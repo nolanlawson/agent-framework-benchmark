@@ -130,10 +130,12 @@ async function deep(page, fn, arg) {
   return page.evaluateHandle(fn, arg);
 }
 
+// Latency runs from the start of `action` until `until` holds. An action can return its own
+// start time instead (search starts the clock at the last keystroke, not the first).
 async function timed(flow, page, label, action, until) {
   await flow.startTimespan({ name: label });
-  const t0 = Date.now();
-  await action();
+  const start = Date.now();
+  const t0 = (await action()) ?? start;
   await page.waitForFunction(until.fn, { timeout: 30_000, polling: 'mutation' }, until.arg);
   const ms = Date.now() - t0;
   await new Promise((r) => setTimeout(r, 1000));
@@ -162,7 +164,11 @@ async function runFlowOnce(i) {
       'Search',
       async () => {
         await search.click();
-        await page.keyboard.type('char', { delay: 100 });
+        await page.keyboard.type('cha', { delay: 100 });
+        // "cha" matches more than 7 Pokémon, so the wait below can only end after the last key.
+        const lastKey = Date.now();
+        await page.keyboard.press('r', { delay: 100 });
+        return lastKey;
       },
       { fn: () => /(^|\s)7 Pokémon(\s|$)/.test(window.__deep.text()) && window.__deep.link('/pokemon/pecharunt') },
     );
