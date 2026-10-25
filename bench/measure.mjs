@@ -27,7 +27,8 @@ const out = path.resolve(outArg);
 fs.mkdirSync(path.join(out, 'lighthouse'), { recursive: true });
 
 const CHROME = chromium.executablePath();
-const CHROME_FLAGS = ['--headless=new', '--no-sandbox', '--ignore-certificate-errors', '--disable-gpu'];
+// Completed with the flag that makes Chrome trust Caddy's certificates once the stack is up.
+const CHROME_FLAGS = ['--headless=new', '--no-sandbox', '--disable-gpu'];
 const LH_URLS = {
   home: '/',
   'home-filtered': '/?type=fire&generation=generation-i',
@@ -141,7 +142,7 @@ async function timed(flow, page, label, action, until) {
 }
 
 async function runFlowOnce(i) {
-  const browser = await puppeteer.launch({ executablePath: CHROME, args: CHROME_FLAGS, acceptInsecureCerts: true });
+  const browser = await puppeteer.launch({ executablePath: CHROME, args: CHROME_FLAGS });
   try {
     const page = await browser.newPage();
     await page.evaluateOnNewDocument(DEEP_HELPERS);
@@ -309,6 +310,7 @@ function codeStats() {
 const results = { appDir, measuredAt: new Date().toISOString(), runs: RUNS };
 console.log(`Measuring ${appDir}`);
 const stack = await startStack(appDir, { build: !args.includes('--skip-build') });
+CHROME_FLAGS.push(stack.chromeCertFlag);
 try {
   results.buildMs = stack.buildMs;
   // Warm up server-side caches: the measured visit is a new user on a site others already use.

@@ -5,6 +5,7 @@
 //   https://api.localhost:8444  -> API on :9200 (normal data, no overlay, no latency)
 
 import { spawn, spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,7 @@ export const APP_PORT = 3200;
 const API_PORT = 9200;
 const CADDY_DIR = path.join(BENCH, '.caddy');
 const CADDY_ROOT_CERT = path.join(CADDY_DIR, 'pki/authorities/local/root.crt');
+const CADDY_INTERMEDIATE_CERT = path.join(CADDY_DIR, 'pki/authorities/local/intermediate.crt');
 
 const CADDYFILE = `{
   admin off
@@ -116,7 +118,11 @@ export async function startStack(appDir, { build = true } = {}) {
     const app = start('App', 'npm', ['start'], { cwd: appDir, env });
     procs.push(app);
     await waitFor(`http://localhost:${APP_PORT}/`, app);
-    return { buildMs, stop };
+    // Chrome accepts certificates whose key hash is listed here. Unlike --ignore-certificate-errors,
+    // this keeps its HTTP cache working, so the flow doesn't re-download files a real visitor has.
+    const spki = (file) => crypto.createHash('sha256').update(new crypto.X509Certificate(fs.readFileSync(file)).publicKey.export({ type: 'spki', format: 'der' })).digest('base64');
+    const chromeCertFlag = `--ignore-certificate-errors-spki-list=${[CADDY_ROOT_CERT, CADDY_INTERMEDIATE_CERT].map(spki).join(',')}`;
+    return { buildMs, chromeCertFlag, stop };
   } catch (err) {
     await stop();
     throw err;
