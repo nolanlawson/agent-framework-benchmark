@@ -51,8 +51,7 @@ function readIteration(dir) {
 
 function metrics(it) {
   const m = it.measure;
-  const lh = (formFactor, key) =>
-    m ? mean(Object.entries(m.lighthouse).filter(([k]) => k.endsWith(`/${formFactor}`)).map(([, v]) => v.median[key])) : null;
+  const lh = (key) => (m ? mean(Object.entries(m.lighthouse).filter(([k]) => k.endsWith('/mobile')).map(([, v]) => v.median[key])) : null);
   return {
     testsPassed: it.info.final_test_exit === '0',
     tokens: it.agent?.tokens.total ?? null,
@@ -63,15 +62,13 @@ function metrics(it) {
     cost: it.agent?.costUSD ?? null,
     wallMin: it.agent ? it.agent.wallMs / 60000 : null,
     turns: it.agent?.turns ?? null,
-    mobilePerf: lh('mobile', 'performance'),
-    mobileLcp: lh('mobile', 'lcp'),
-    mobileFcp: lh('mobile', 'fcp'),
-    mobileTbt: lh('mobile', 'tbt'),
-    mobileCls: lh('mobile', 'cls'),
-    jsKiB: lh('mobile', 'scriptBytes'),
-    a11y: lh('mobile', 'accessibility'),
-    desktopPerf: lh('desktop', 'performance'),
-    desktopLcp: lh('desktop', 'lcp'),
+    mobilePerf: lh('performance'),
+    mobileLcp: lh('lcp'),
+    mobileFcp: lh('fcp'),
+    mobileTbt: lh('tbt'),
+    mobileCls: lh('cls'),
+    jsKiB: lh('scriptBytes'),
+    a11y: lh('accessibility'),
     search: m?.flow.latency.search ?? null,
     open: m?.flow.latency.openPokemon ?? null,
     sort: m?.flow.latency.sortMoves ?? null,
@@ -99,7 +96,6 @@ const COLUMNS = [
   ['TBT (ms)', (r) => fmt(r.mobileTbt)],
   ['CLS', (r) => fmt(r.mobileCls, 3)],
   ['JS (KiB)', (r) => fmt(r.jsKiB, 0, 1 / 1024)],
-  ['Desktop perf', (r) => fmt(r.desktopPerf, 0, 100)],
   ['A11y', (r) => fmt(r.a11y, 0, 100)],
   ['Search (ms)', (r) => fmt(r.search)],
   ['Open Pokémon (ms)', (r) => fmt(r.open)],
@@ -169,7 +165,7 @@ export function writeReport(runDir) {
 
 Run \`${path.basename(runDir)}\`, started ${config.startedAt ?? '—'}.
 ${config.iterations ?? '?'} iteration(s) per framework; numbers are medians across iterations.
-Lighthouse values are means over ${Object.keys(iterations[0]?.measure?.lighthouse ?? {}).length / 2 || 6} URLs, each the median of ${config.lighthouseRuns ?? '?'} runs.
+Lighthouse values are means over 6 URLs, each the median of ${config.lighthouseRuns ?? '?'} runs.
 Sorted by total tokens.
 
 ## Building the app (agent)
@@ -178,21 +174,21 @@ Total tokens = cache reads + uncached input (input and cache writes) + output.
 
 ${table(COLUMNS.slice(0, 8))}
 
-## Page loads (Lighthouse, mobile preset unless noted)
+## Page loads (Lighthouse, mobile settings)
 
-${table(COLUMNS.slice(8, 16))}
+${table(COLUMNS.slice(8, 15))}
 
 ## Interactions (scripted flow, DevTools throttling)
 
 Time from the user's action until the result is on screen (for search, from the last keystroke).
 
-${table(COLUMNS.slice(16, 21))}
+${table(COLUMNS.slice(15, 20))}
 
 ## Codebase and fidelity
 
 "Visual match" is the share of pixels that match the reference screenshots (1 = identical).
 
-${table(COLUMNS.slice(21))}
+${table(COLUMNS.slice(20))}
 
 ## Versions
 

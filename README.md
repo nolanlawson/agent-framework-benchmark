@@ -93,7 +93,7 @@ credential. Use a key with a spending limit.
    - `pokeapi.co` resolves to localhost, so the app can only use the local API.
 3. **Measurement.** Each app is built and served in production mode behind Caddy (HTTPS,
    HTTP/2, zstd/gzip), with the API behind Caddy too. Then:
-   - **Lighthouse**, mobile and desktop presets, on 6 URLs: the median of N runs. Server-side
+   - **Lighthouse**, mobile settings only, on 6 URLs: the median of N runs. Server-side
      caches are warmed first, so each visit is a new user on a site other people already use.
    - **A scripted user flow** under DevTools throttling: type in search, open a Pokémon, sort
      the moves table, change the game. It records the time from each action until the result is

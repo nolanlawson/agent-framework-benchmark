@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import lighthouse, { desktopConfig, startFlow } from 'lighthouse';
+import lighthouse, { startFlow } from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import puppeteer from 'puppeteer-core';
 import { chromium } from 'playwright';
@@ -72,28 +72,29 @@ function summarizeLhr(lhr) {
 
 async function runLighthouse() {
   const results = {};
-  for (const [formFactor, config] of [['mobile', undefined], ['desktop', desktopConfig]]) {
-    for (const [page, urlPath] of Object.entries(LH_URLS)) {
-      const runs = [];
-      for (let i = 0; i < RUNS; i++) {
-        const chrome = await chromeLauncher.launch({ chromePath: CHROME, chromeFlags: CHROME_FLAGS });
-        try {
-          const { lhr } = await lighthouse(
-            APP_ORIGIN + urlPath,
-            { port: chrome.port, output: 'json', logLevel: 'error', onlyCategories: ['performance', 'accessibility'] },
-            config,
-          );
-          if (lhr.runtimeError) throw new Error(`${urlPath}: ${lhr.runtimeError.message}`);
-          runs.push(summarizeLhr(lhr));
-          if (i === 0) fs.writeFileSync(path.join(out, 'lighthouse', `${page}-${formFactor}.json`), JSON.stringify(lhr));
-        } finally {
-          await chrome.kill();
-        }
+  // Lighthouse's default (mobile) settings only. The desktop preset mostly measured the layout
+  // shift caused by Linux scrollbars appearing, which macOS users never see.
+  for (const [page, urlPath] of Object.entries(LH_URLS)) {
+    const runs = [];
+    for (let i = 0; i < RUNS; i++) {
+      const chrome = await chromeLauncher.launch({ chromePath: CHROME, chromeFlags: CHROME_FLAGS });
+      try {
+        const { lhr } = await lighthouse(APP_ORIGIN + urlPath, {
+          port: chrome.port,
+          output: 'json',
+          logLevel: 'error',
+          onlyCategories: ['performance', 'accessibility'],
+        });
+        if (lhr.runtimeError) throw new Error(`${urlPath}: ${lhr.runtimeError.message}`);
+        runs.push(summarizeLhr(lhr));
+        if (i === 0) fs.writeFileSync(path.join(out, 'lighthouse', `${page}-mobile.json`), JSON.stringify(lhr));
+      } finally {
+        await chrome.kill();
       }
-      const summary = Object.fromEntries(Object.keys(runs[0]).map((k) => [k, round(median(runs.map((r) => r[k])), 3)]));
-      results[`${page}/${formFactor}`] = { median: summary, runs };
-      console.log(`  ${formFactor.padEnd(7)} ${page.padEnd(14)} perf ${summary.performance}  LCP ${round(summary.lcp)}ms  TBT ${round(summary.tbt)}ms  CLS ${summary.cls}  JS ${round(summary.scriptBytes / 1024)}KiB`);
     }
+    const summary = Object.fromEntries(Object.keys(runs[0]).map((k) => [k, round(median(runs.map((r) => r[k])), 3)]));
+    results[`${page}/mobile`] = { median: summary, runs };
+    console.log(`  ${page.padEnd(14)} perf ${summary.performance}  LCP ${round(summary.lcp)}ms  TBT ${round(summary.tbt)}ms  CLS ${summary.cls}  JS ${round(summary.scriptBytes / 1024)}KiB`);
   }
   return results;
 }
