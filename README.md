@@ -52,6 +52,7 @@ Agents, and the apps they write, only ever run inside containers.
 | `--skip-image-build` | | Reuse the existing images |
 | `--no-measure` | | Stop after the agents finish |
 | `--measure-failed` | | Also measure apps that failed the final tests. By default they're skipped, so broken apps don't get performance numbers |
+| `--append-to=runs/<id>` | | Add the iterations to an earlier run, numbered after the existing ones (`next-4`, `next-5`, …), then measure every app in it. The batch's settings, harness commit and images go under `appended-<id>` in `config.json` |
 | `--measure-only=runs/<id>` | | Measure an earlier run again and rewrite its report. Rebuilds only the base and measure images, and records them as `measureOnlyImages` in `config.json` |
 | `--report-only=runs/<id>` | | Only rewrite `report.md` |
 | `--out=DIR` | `runs` | Where run directories go |

@@ -16,6 +16,7 @@
 //
 // Usage:
 //   node bench/run.mjs --frameworks=vanilla,astro [--iterations=1] [options]
+//   node bench/run.mjs --frameworks=all --append-to=runs/<id>   add iterations to an earlier run
 //   node bench/run.mjs --measure-only=runs/<id>     re-measure and re-report an earlier run
 //   node bench/run.mjs --report-only=runs/<id>      only regenerate report.md
 // Options:
@@ -29,6 +30,8 @@
 //   --lighthouse-runs=N     Lighthouse runs per URL and form factor (default 5)
 //   --no-cache              rebuild images without Podman's layer cache (pulls fresh base)
 //   --skip-image-build      reuse existing images
+//   --append-to=DIR         add the iterations to that run, numbered after its existing ones,
+//                           then measure every app in it (not just the new ones)
 //   --no-measure            stop after the agent runs
 //   --measure-failed        also measure apps that failed the final tests (skipped by default)
 //   --out=DIR               where run directories go (default ./runs)
@@ -144,7 +147,7 @@ function credentialName() {
 
 // --measure-only passes agent: false, so it doesn't rebuild the agent image or overwrite the
 // record of the images the agents ran in.
-function buildImages(runDir, { agent = true } = {}) {
+function buildImages(runDir, { agent = true, key = agent ? 'images' : 'measureOnlyImages' } = {}) {
   const ctx = path.join(runDir, '.build');
   fs.rmSync(ctx, { recursive: true, force: true });
   fs.mkdirSync(ctx, { recursive: true });
@@ -163,8 +166,7 @@ function buildImages(runDir, { agent = true } = {}) {
   }
   build(IMAGES.measure, path.join(BENCH, 'container/Containerfile.measure'), BENCH, ['--build-arg', `BASE=${IMAGES.base}`]);
   fs.rmSync(ctx, { recursive: true, force: true });
-  if (agent) recordImages(runDir, 'images', Object.values(IMAGES));
-  else recordImages(runDir, 'measureOnlyImages', [IMAGES.base, IMAGES.measure]);
+  recordImages(runDir, key, agent ? Object.values(IMAGES) : [IMAGES.base, IMAGES.measure]);
 }
 
 // The harness commit, and whether the working tree had changes.
@@ -249,8 +251,10 @@ async function testApp(iterDir) {
 
 async function runAgents(runId, runDir, frameworks, credential) {
   for (const fw of frameworks) {
-    for (let i = 1; i <= config.iterations; i++) {
+    for (let i = 1, added = 0; added < config.iterations; i++) {
       const dir = path.join(runDir, `${fw}-${i}`);
+      if (fs.existsSync(dir)) continue; // an existing iteration (--append-to)
+      added++;
       await runAgent(runId, dir, fw, credential);
       await testApp(dir);
     }
@@ -330,28 +334,32 @@ async function main() {
   const credential = credentialName();
 
   const runId = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '').replace('T', '-');
-  const runDir = path.resolve(opts.out ?? path.join(ROOT, 'runs'), runId);
+  const appendTo = opts['append-to'] && path.resolve(opts['append-to']);
+  const runDir = appendTo || path.resolve(opts.out ?? path.join(ROOT, 'runs'), runId);
+  const configFile = path.join(runDir, 'config.json');
+  const batch = {
+    ...config,
+    frameworks,
+    prompts: Object.fromEntries(frameworks.map((f) => [f, prompt(FRAMEWORKS[f])])),
+    startedAt: new Date().toISOString(),
+    nodeVersion: NODE_VERSION,
+    ...harnessState(),
+    podman: podmanVersion,
+    host: { platform: os.platform(), release: os.release(), cpus: os.cpus()[0]?.model, cores: os.cpus().length, memoryGiB: Math.round(os.totalmem() / 2 ** 30) },
+  };
+  // An appended batch goes under its own key, next to the run's original config.
+  const appendKey = `appended-${runId}`;
+  let runConfig = batch;
+  if (appendTo) {
+    runConfig = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+    runConfig.iterations += config.iterations;
+    runConfig[appendKey] = batch;
+  }
   fs.mkdirSync(runDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(runDir, 'config.json'),
-    JSON.stringify(
-      {
-        ...config,
-        frameworks,
-        prompts: Object.fromEntries(frameworks.map((f) => [f, prompt(FRAMEWORKS[f])])),
-        startedAt: new Date().toISOString(),
-        nodeVersion: NODE_VERSION,
-        ...harnessState(),
-        podman: podmanVersion,
-        host: { platform: os.platform(), release: os.release(), cpus: os.cpus()[0]?.model, cores: os.cpus().length, memoryGiB: Math.round(os.totalmem() / 2 ** 30) },
-      },
-      null,
-      2,
-    ),
-  );
+  fs.writeFileSync(configFile, JSON.stringify(runConfig, null, 2));
   log(`Run ${runId}: ${frameworks.join(', ')} x ${config.iterations} -> ${runDir}`);
 
-  if (!opts['skip-image-build']) buildImages(runDir);
+  if (!opts['skip-image-build']) buildImages(runDir, appendTo ? { key: `${appendKey}-images` } : {});
   await runAgents(runId, runDir, frameworks, credential);
   if (!opts['no-measure']) await measureAll(runDir);
   writeReport(runDir);
