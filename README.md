@@ -1,4 +1,10 @@
-# Pokédex framework benchmark
+# Agent framework benchmark
+
+> [!NOTE]  
+> This is an AI-generated project. If you don't want to read AI-authored prose, stop reading now.
+
+> [!IMPORTANT]
+> PRs are closed on this project. If you want to improve it, please open an issue or create a fork. I don't intend to maintain this benchmark forever and keep running new benchmarks on new frameworks endlessly. I'd be much more interested to see what you all build with this project (and run with your own tokens 🙂).
 
 How many tokens, and how much time, does a coding agent need to build the same
 non-trivial web app in different frameworks? And how fast is the app it builds?
