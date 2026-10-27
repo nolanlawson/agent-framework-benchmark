@@ -6,6 +6,9 @@
 > [!IMPORTANT]
 > PRs are closed on this project. If you want to improve it, please open an issue or create a fork. I don't intend to maintain this benchmark forever and keep running new benchmarks on new frameworks endlessly. I'd be much more interested to see what you all build with this project (and run with your own tokens 🙂).
 
+> [!NOTE]
+> [Benchmark results]https://github.com/nolanlawson/agent-framework-benchmark-results) for the blog post are available if you want to peruse them.
+
 How many tokens, and how much time, does a coding agent need to build the same
 non-trivial web app in different frameworks? And how fast is the app it builds?
 
