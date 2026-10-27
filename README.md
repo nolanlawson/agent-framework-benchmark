@@ -221,5 +221,13 @@ node measure.mjs ../gold /tmp/gold-results --runs 1 --skip-build   # needs Caddy
   - the commit of every skill and plugin repo (`agent/tooling-versions.json`)
   - Node, npm, Playwright, Claude Code and agent-browser versions (`agent/run-info.txt`)
   - the image IDs and the Ubuntu base image digest (`config.json`)
+- **Some text checks don't read inside shadow roots.** The spec allows open shadow roots, and
+  the tests' role, label and text locators find elements inside them. But `textOf` and
+  `expectText` in `template/tests/specs/helpers.mjs` read `innerText`, which leaves out the
+  contents of shadow roots below the element. An app that rendered, say, a move's Power or a
+  Pokémon's Height inside a component's shadow root would fail those checks. No app so far
+  has: Gracile's shadow-DOM components hold only the list and the moves table, which the
+  tests check through roles. The helpers are left as they are, so the tests match what
+  earlier agents saw.
 - **One iteration is an anecdote.** Agent runs vary a lot; use 3 or more iterations before
   drawing conclusions.
