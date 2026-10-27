@@ -27,7 +27,6 @@ const median = (xs) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
-const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 // Missing values print as a dash. Scale before formatting, never before the null check
 // (null * 100 is 0 in JS).
 const fmt = (x, d = 0, scale = 1) => (x === null || x === undefined || Number.isNaN(x) ? '—' : (x * scale).toFixed(d));
@@ -51,7 +50,8 @@ function readIteration(dir) {
 
 function metrics(it) {
   const m = it.measure;
-  const lh = (key) => (m ? mean(Object.entries(m.lighthouse).filter(([k]) => k.endsWith('/mobile')).map(([, v]) => v.median[key])) : null);
+  // Page loads are the home page's; results.json has every URL.
+  const lh = (key) => m?.lighthouse['home/mobile']?.median[key] ?? null;
   return {
     testsPassed: it.info.final_test_exit === '0',
     tokens: it.agent?.tokens.total ?? null,
@@ -149,8 +149,8 @@ export function writeReport(runDir) {
 
 Run \`${path.basename(runDir)}\`, started ${config.startedAt ?? '—'}.
 ${config.iterations ?? '?'} iteration(s) per framework; numbers are medians across iterations.
-Lighthouse values are means over 6 URLs of each URL's median over ${config.lighthouseRuns ?? '?'} runs. Medians are
-taken per metric, so one URL's LCP and TBT can come from different runs.
+Lighthouse values are for the home page (\`/\`): the median of ${config.lighthouseRuns ?? '?'} runs, taken per metric, so LCP
+and TBT can come from different runs. Each iteration's measure/results.json has all 6 URLs.
 Sorted by total tokens.
 
 ## Building the app (agent)

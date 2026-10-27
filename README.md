@@ -101,7 +101,8 @@ credential. Use a key with a spending limit.
    - Apps that failed the final tests are skipped unless you pass `--measure-failed`.
    - **Lines of code**: non-blank lines in the app's source files (comments included), not
      counting JSON, lockfiles, tests, generated files, or copies of the provided design files.
-4. **Report.** `bench/report.mjs` writes `report.md` and `summary.json`. With several
+4. **Report.** `bench/report.mjs` writes `report.md` and `summary.json`. Page-load numbers
+   are the home page's (every URL is in each iteration's `measure/results.json`). With several
    iterations, each framework's numbers are medians across them.
 
 ### The prompt
